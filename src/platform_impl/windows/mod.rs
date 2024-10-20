@@ -465,13 +465,13 @@ pub(crate) struct MenuChild {
     accelerator: Option<Accelerator>,
 
     // predefined menu item fields
-    predefined_item_type: Option<PredefinedMenuItemType>,
+    pub(crate) predefined_item_type: Option<PredefinedMenuItemType>,
 
     // check menu item fields
     checked: bool,
 
     // icon menu item fields
-    icon: Option<Icon>,
+    pub(crate) icon: Option<Icon>,
 
     // submenu fields
     hmenu: HMENU,

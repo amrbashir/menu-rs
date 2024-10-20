@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-License-Identifier: MIT
 
+mod about_dialog;
 mod accelerator;
 mod icon;
 
+pub use about_dialog::AboutDialog;
 pub(crate) use icon::PlatformIcon;
 
 use crate::{
@@ -17,7 +19,7 @@ use crate::{
 };
 use accelerator::{from_gtk_mnemonic, parse_accelerator, to_gtk_mnemonic};
 use glib::translate::ToGlibPtr;
-use gtk::{gdk, glib, prelude::*, AboutDialog, Container, Orientation};
+use gtk::{gdk, glib, prelude::*, Container, Orientation};
 use std::{
     cell::RefCell,
     collections::{hash_map::Entry, HashMap},
@@ -408,14 +410,14 @@ pub struct MenuChild {
     gtk_accelerator: Option<(gdk::ModifierType, u32)>,
 
     // predefined menu item fields
-    predefined_item_type: Option<PredefinedMenuItemType>,
+    pub(crate) predefined_item_type: Option<PredefinedMenuItemType>,
 
     // check menu item fields
     checked: Option<Rc<AtomicBool>>,
     is_syncing_checked_state: Option<Rc<AtomicBool>>,
 
     // icon menu item fields
-    icon: Option<Icon>,
+    pub(crate) icon: Option<Icon>,
 
     // submenu fields
     pub children: Option<Vec<Rc<RefCell<MenuChild>>>>,
@@ -1144,42 +1146,8 @@ impl MenuChild {
                 let item = make_item();
                 register_accel(&item);
                 item.connect_activate(move |_| {
-                    if let Some(metadata) = &metadata {
-                        let mut builder = AboutDialog::builder().modal(true).resizable(false);
-
-                        if let Some(name) = &metadata.name {
-                            builder = builder.program_name(name);
-                        }
-                        if let Some(version) = &metadata.full_version() {
-                            builder = builder.version(version);
-                        }
-                        if let Some(authors) = &metadata.authors {
-                            builder = builder.authors(authors.clone());
-                        }
-                        if let Some(comments) = &metadata.comments {
-                            builder = builder.comments(comments);
-                        }
-                        if let Some(copyright) = &metadata.copyright {
-                            builder = builder.copyright(copyright);
-                        }
-                        if let Some(license) = &metadata.license {
-                            builder = builder.license(license);
-                        }
-                        if let Some(website) = &metadata.website {
-                            builder = builder.website(website);
-                        }
-                        if let Some(website_label) = &metadata.website_label {
-                            builder = builder.website_label(website_label);
-                        }
-                        if let Some(icon) = &metadata.icon {
-                            builder = builder.logo(&icon.inner.to_pixbuf());
-                        }
-
-                        let about = builder.build();
-                        about.run();
-                        unsafe {
-                            about.destroy();
-                        }
+                    if let Some(metadata) = metadata.clone() {
+                        AboutDialog::new(metadata).show();
                     }
                 });
                 item

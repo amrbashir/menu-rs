@@ -34,6 +34,11 @@ impl IsMenuItem for PredefinedMenuItem {
 }
 
 impl PredefinedMenuItem {
+    /// The type of predefined menu item
+    pub fn predefined_item_type(&self) -> Option<PredefinedMenuItemType> {
+        self.inner.borrow().predefined_item_type.clone()
+    }
+
     /// Separator menu item
     pub fn separator() -> PredefinedMenuItem {
         PredefinedMenuItem::new::<&str>(PredefinedMenuItemType::Separator, None)
@@ -241,7 +246,7 @@ fn test_about_metadata() {
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 #[allow(clippy::large_enum_variant)]
-pub(crate) enum PredefinedMenuItemType {
+pub enum PredefinedMenuItemType {
     Separator,
     Copy,
     Cut,

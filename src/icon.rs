@@ -163,6 +163,18 @@ impl Icon {
         let win_icon = PlatformIcon::from_resource(ordinal, size)?;
         Ok(Icon { inner: win_icon })
     }
+
+    /// Convert the icon into a GTK pixbuf object.
+    #[cfg(target_os = "linux")]
+    pub fn to_pixbuf(&self) -> gtk::gdk_pixbuf::Pixbuf {
+        self.inner.to_pixbuf()
+    }
+
+    /// Convert the icon into PNG.
+    #[cfg(target_os = "linux")]
+    pub fn to_png(&self) -> Vec<u8> {
+        self.inner.to_png()
+    }
 }
 
 /// A native Icon to be used for the menu item

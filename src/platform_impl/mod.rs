@@ -12,6 +12,9 @@ mod platform;
 #[path = "macos/mod.rs"]
 mod platform;
 
+#[cfg(target_os = "linux")]
+pub use platform::AboutDialog;
+
 use std::{
     cell::{Ref, RefCell, RefMut},
     rc::Rc,

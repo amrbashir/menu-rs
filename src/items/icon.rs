@@ -145,24 +145,24 @@ impl IconMenuItem {
         &self.id
     }
 
-    /// Get the text for this check menu item.
+    /// Get the text for this menu item.
     pub fn text(&self) -> String {
         self.inner.borrow().text()
     }
 
-    /// Set the text for this check menu item. `text` could optionally contain
+    /// Set the text for this menu item. `text` could optionally contain
     /// an `&` before a character to assign this character as the mnemonic
-    /// for this check menu item. To display a `&` without assigning a mnemenonic, use `&&`.
+    /// for this menu item. To display a `&` without assigning a mnemenonic, use `&&`.
     pub fn set_text<S: AsRef<str>>(&self, text: S) {
         self.inner.borrow_mut().set_text(text.as_ref())
     }
 
-    /// Get whether this check menu item is enabled or not.
+    /// Get whether this menu item is enabled or not.
     pub fn is_enabled(&self) -> bool {
         self.inner.borrow().is_enabled()
     }
 
-    /// Enable or disable this check menu item.
+    /// Enable or disable this menu item.
     pub fn set_enabled(&self, enabled: bool) {
         self.inner.borrow_mut().set_enabled(enabled)
     }
@@ -170,6 +170,11 @@ impl IconMenuItem {
     /// Set this icon menu item accelerator.
     pub fn set_accelerator(&self, accelerator: Option<Accelerator>) -> crate::Result<()> {
         self.inner.borrow_mut().set_accelerator(accelerator)
+    }
+
+    /// Get the icon for this menu item.
+    pub fn icon(&self) -> Option<Icon> {
+        self.inner.borrow().icon.clone()
     }
 
     /// Change this menu item icon or remove it.

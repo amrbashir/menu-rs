@@ -176,6 +176,9 @@ pub use items::*;
 pub use menu::*;
 pub use menu_id::MenuId;
 
+#[cfg(target_os = "linux")]
+pub use platform_impl::AboutDialog;
+
 /// An enumeration of all available menu types, useful to match against
 /// the items returned from [`Menu::items`] or [`Submenu::items`]
 #[derive(Clone)]
@@ -388,6 +391,9 @@ pub trait ContextMenu {
     #[cfg(target_os = "linux")]
     fn gtk_context_menu(&self) -> gtk::Menu;
 
+    /// Get all menu items as a vector of `MenuItemKind` elements.
+    fn items(&self) -> Vec<MenuItemKind>;
+
     /// Shows this menu as a context menu for the specified `NSView`.
     ///
     /// - `position` is relative to the window top-left corner, if `None`, the cursor position is used.
@@ -457,7 +463,7 @@ impl MenuEvent {
         }
     }
 
-    pub(crate) fn send(event: MenuEvent) {
+    pub fn send(event: MenuEvent) {
         if let Some(handler) = MENU_EVENT_HANDLER.get_or_init(|| None) {
             handler(event);
         } else {

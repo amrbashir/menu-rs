@@ -200,13 +200,13 @@ pub struct MenuChild {
     accelerator: Option<Accelerator>,
 
     // predefined menu item fields
-    predefined_item_type: Option<PredefinedMenuItemType>,
+    pub(crate) predefined_item_type: Option<PredefinedMenuItemType>,
 
     // check menu item fields
     checked: Cell<bool>,
 
     // icon menu item fields
-    icon: Option<Icon>,
+    pub(crate) icon: Option<Icon>,
     native_icon: Option<NativeIcon>,
 
     // submenu fields

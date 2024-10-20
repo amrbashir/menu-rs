@@ -407,6 +407,10 @@ impl ContextMenu for Menu {
         self.inner.borrow_mut().gtk_context_menu()
     }
 
+    fn items(&self) -> Vec<MenuItemKind> {
+        self.inner.borrow_mut().items()
+    }
+
     #[cfg(target_os = "macos")]
     unsafe fn show_context_menu_for_nsview(
         &self,
