@@ -2,8 +2,6 @@
 // Copyright 2021-2022 Tauri Programme within The Commons Conservancy
 // SPDX-License-Identifier: Apache-2.0
 
-use std::io::Cursor;
-
 use gtk::gdk_pixbuf::{Colorspace, Pixbuf};
 
 use crate::icon::BadIcon;
@@ -63,21 +61,5 @@ impl PlatformIcon {
         self.to_pixbuf()
             .scale_simple(w, h, gtk::gdk_pixbuf::InterpType::Bilinear)
             .unwrap()
-    }
-
-    pub fn to_png(&self) -> Vec<u8> {
-        let mut png = Vec::new();
-
-        {
-            let mut encoder =
-                png::Encoder::new(Cursor::new(&mut png), self.width as _, self.height as _);
-            encoder.set_color(png::ColorType::Rgba);
-            encoder.set_depth(png::BitDepth::Eight);
-
-            let mut writer = encoder.write_header().unwrap();
-            writer.write_image_data(&self.raw).unwrap();
-        }
-
-        png
     }
 }

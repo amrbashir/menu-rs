@@ -391,7 +391,7 @@ pub trait ContextMenu {
     #[cfg(target_os = "linux")]
     fn gtk_context_menu(&self) -> gtk::Menu;
 
-    /// Get all menu items as a vector of `MenuItemKind` elements.
+    /// Get all menu items within this context menu.
     fn items(&self) -> Vec<MenuItemKind>;
 
     /// Shows this menu as a context menu for the specified `NSView`.

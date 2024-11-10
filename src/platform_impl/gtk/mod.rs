@@ -33,15 +33,15 @@ macro_rules! is_item_supported {
     ($item:tt) => {{
         let child = $item.child();
         let child_ = child.borrow();
-        let supported = if let Some(predefined_item_type) = &child_.predefined_item_type {
+        let supported = if let Some(predefined_item_kind) = &child_.predefined_item_kind {
             matches!(
-                predefined_item_type,
-                PredefinedMenuItemType::Separator
-                    | PredefinedMenuItemType::Copy
-                    | PredefinedMenuItemType::Cut
-                    | PredefinedMenuItemType::Paste
-                    | PredefinedMenuItemType::SelectAll
-                    | PredefinedMenuItemType::About(_)
+                predefined_item_kind,
+                PredefinedMenuItemKind::Separator
+                    | PredefinedMenuItemKind::Copy
+                    | PredefinedMenuItemKind::Cut
+                    | PredefinedMenuItemKind::Paste
+                    | PredefinedMenuItemKind::SelectAll
+                    | PredefinedMenuItemKind::About(_)
             )
         } else {
             true
@@ -410,7 +410,7 @@ pub struct MenuChild {
     gtk_accelerator: Option<(gdk::ModifierType, u32)>,
 
     // predefined menu item fields
-    pub(crate) predefined_item_type: Option<PredefinedMenuItemType>,
+    pub(crate) predefined_item_kind: Option<PredefinedMenuItemKind>,
 
     // check menu item fields
     checked: Option<Rc<AtomicBool>>,
@@ -512,7 +512,7 @@ impl MenuChild {
             gtk_menus: None,
             icon: None,
             is_syncing_checked_state: None,
-            predefined_item_type: None,
+            predefined_item_kind: None,
         }
     }
 
@@ -530,20 +530,20 @@ impl MenuChild {
             gtk_accelerator: None,
             icon: None,
             is_syncing_checked_state: None,
-            predefined_item_type: None,
+            predefined_item_kind: None,
             accelerator: None,
             checked: None,
         }
     }
 
-    pub(crate) fn new_predefined(item_type: PredefinedMenuItemType, text: Option<String>) -> Self {
+    pub(crate) fn new_predefined(item_type: PredefinedMenuItemKind, text: Option<String>) -> Self {
         Self {
             text: text.unwrap_or_else(|| item_type.text().to_string()),
             enabled: true,
             accelerator: item_type.accelerator(),
             id: MenuId(COUNTER.next().to_string()),
             item_type: MenuItemType::Predefined,
-            predefined_item_type: Some(item_type),
+            predefined_item_kind: Some(item_type),
             gtk_menu_items: Rc::new(RefCell::new(HashMap::new())),
             accel_group: None,
             checked: None,
@@ -578,7 +578,7 @@ impl MenuChild {
             gtk_menu: None,
             gtk_menus: None,
             icon: None,
-            predefined_item_type: None,
+            predefined_item_kind: None,
         }
     }
 
@@ -604,7 +604,7 @@ impl MenuChild {
             gtk_menu: None,
             gtk_menus: None,
             is_syncing_checked_state: None,
-            predefined_item_type: None,
+            predefined_item_kind: None,
         }
     }
 
@@ -630,7 +630,7 @@ impl MenuChild {
             gtk_menus: None,
             icon: None,
             is_syncing_checked_state: None,
-            predefined_item_type: None,
+            predefined_item_kind: None,
         }
     }
 }
@@ -1094,7 +1094,7 @@ impl MenuChild {
             .as_ref()
             .map(parse_accelerator)
             .transpose()?;
-        let predefined_item_type = self.predefined_item_type.clone().unwrap();
+        let predefined_item_kind = self.predefined_item_kind.clone().unwrap();
 
         let make_item = || {
             gtk::MenuItem::builder()
@@ -1117,17 +1117,17 @@ impl MenuChild {
             }
         };
 
-        let item = match predefined_item_type {
-            PredefinedMenuItemType::Separator => {
+        let item = match predefined_item_kind {
+            PredefinedMenuItemKind::Separator => {
                 gtk::SeparatorMenuItem::new().upcast::<gtk::MenuItem>()
             }
-            PredefinedMenuItemType::Copy
-            | PredefinedMenuItemType::Cut
-            | PredefinedMenuItemType::Paste
-            | PredefinedMenuItemType::SelectAll => {
+            PredefinedMenuItemKind::Copy
+            | PredefinedMenuItemKind::Cut
+            | PredefinedMenuItemKind::Paste
+            | PredefinedMenuItemKind::SelectAll => {
                 let item = make_item();
                 let (mods, key) =
-                    parse_accelerator(&predefined_item_type.accelerator().unwrap()).unwrap();
+                    parse_accelerator(&predefined_item_kind.accelerator().unwrap()).unwrap();
                 item.child()
                     .unwrap()
                     .downcast::<gtk::AccelLabel>()
@@ -1137,12 +1137,12 @@ impl MenuChild {
                     // TODO: wayland
                     #[cfg(feature = "libxdo")]
                     if let Ok(xdo) = libxdo::XDo::new(None) {
-                        let _ = xdo.send_keysequence(predefined_item_type.xdo_keys(), 0);
+                        let _ = xdo.send_keysequence(predefined_item_kind.xdo_keys(), 0);
                     }
                 });
                 item
             }
-            PredefinedMenuItemType::About(metadata) => {
+            PredefinedMenuItemKind::About(metadata) => {
                 let item = make_item();
                 register_accel(&item);
                 item.connect_activate(move |_| {
@@ -1415,14 +1415,14 @@ fn show_context_menu(
     false
 }
 
-impl PredefinedMenuItemType {
+impl PredefinedMenuItemKind {
     #[cfg(feature = "libxdo")]
     fn xdo_keys(&self) -> &str {
         match self {
-            PredefinedMenuItemType::Copy => "ctrl+c",
-            PredefinedMenuItemType::Cut => "ctrl+X",
-            PredefinedMenuItemType::Paste => "ctrl+v",
-            PredefinedMenuItemType::SelectAll => "ctrl+a",
+            PredefinedMenuItemKind::Copy => "ctrl+c",
+            PredefinedMenuItemKind::Cut => "ctrl+X",
+            PredefinedMenuItemKind::Paste => "ctrl+v",
+            PredefinedMenuItemKind::SelectAll => "ctrl+a",
             _ => unreachable!(),
         }
     }

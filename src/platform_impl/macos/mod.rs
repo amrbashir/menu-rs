@@ -200,7 +200,7 @@ pub struct MenuChild {
     accelerator: Option<Accelerator>,
 
     // predefined menu item fields
-    pub(crate) predefined_item_type: Option<PredefinedMenuItemType>,
+    pub(crate) predefined_item_kind: Option<PredefinedMenuItemKind>,
 
     // check menu item fields
     checked: Cell<bool>,
@@ -267,7 +267,7 @@ impl MenuChild {
             ns_menu: None,
             ns_menu_items: HashMap::new(),
             ns_menus: None,
-            predefined_item_type: None,
+            predefined_item_kind: None,
         }
     }
 
@@ -295,11 +295,11 @@ impl MenuChild {
             native_icon: None,
             ns_menu_items: HashMap::new(),
             ns_menus: Some(HashMap::new()),
-            predefined_item_type: None,
+            predefined_item_kind: None,
         }
     }
 
-    pub(crate) fn new_predefined(item_type: PredefinedMenuItemType, text: Option<String>) -> Self {
+    pub(crate) fn new_predefined(item_type: PredefinedMenuItemKind, text: Option<String>) -> Self {
         let text = strip_mnemonic(text.unwrap_or_else(|| {
             // Gets the app's name from `NSRunningApplication::localizedName`.
             let app_name = || unsafe {
@@ -308,11 +308,11 @@ impl MenuChild {
             };
 
             match item_type {
-                PredefinedMenuItemType::About(_) => {
+                PredefinedMenuItemKind::About(_) => {
                     format!("About {}", app_name()).trim().to_string()
                 }
-                PredefinedMenuItemType::Hide => format!("Hide {}", app_name()).trim().to_string(),
-                PredefinedMenuItemType::Quit => format!("Quit {}", app_name()).trim().to_string(),
+                PredefinedMenuItemKind::Hide => format!("Hide {}", app_name()).trim().to_string(),
+                PredefinedMenuItemKind::Quit => format!("Quit {}", app_name()).trim().to_string(),
                 _ => item_type.text().to_string(),
             }
         }));
@@ -324,7 +324,7 @@ impl MenuChild {
             enabled: true,
             id: MenuId(COUNTER.next().to_string()),
             accelerator,
-            predefined_item_type: Some(item_type),
+            predefined_item_kind: Some(item_type),
             checked: Cell::new(false),
             children: None,
             icon: None,
@@ -355,7 +355,7 @@ impl MenuChild {
             ns_menu: None,
             ns_menu_items: HashMap::new(),
             ns_menus: None,
-            predefined_item_type: None,
+            predefined_item_kind: None,
         }
     }
 
@@ -379,7 +379,7 @@ impl MenuChild {
             ns_menu: None,
             ns_menu_items: HashMap::new(),
             ns_menus: None,
-            predefined_item_type: None,
+            predefined_item_kind: None,
         }
     }
 
@@ -403,7 +403,7 @@ impl MenuChild {
             ns_menu: None,
             ns_menu_items: HashMap::new(),
             ns_menus: None,
-            predefined_item_type: None,
+            predefined_item_kind: None,
         }
     }
 }
@@ -766,14 +766,14 @@ impl MenuChild {
         menu_id: u32,
     ) -> crate::Result<Retained<NSMenuItem>> {
         let mtm = MainThreadMarker::new().expect("can only create menu item on the main thread");
-        let item_type = self.predefined_item_type.as_ref().unwrap();
+        let item_type = self.predefined_item_kind.as_ref().unwrap();
         let ns_menu_item = match item_type {
-            PredefinedMenuItemType::Separator => NSMenuItem::separatorItem(mtm),
+            PredefinedMenuItemKind::Separator => NSMenuItem::separatorItem(mtm),
             _ => {
                 let ns_menu_item =
                     MenuItem::create(mtm, &self.text, item_type.selector(), &self.accelerator)?;
 
-                if let PredefinedMenuItemType::About(_) = item_type {
+                if let PredefinedMenuItemKind::About(_) = item_type {
                     unsafe {
                         ns_menu_item.setTarget(Some(&ns_menu_item));
 
@@ -789,7 +789,7 @@ impl MenuChild {
         unsafe {
             ns_menu_item.setEnabled(self.enabled);
 
-            if let PredefinedMenuItemType::Services = item_type {
+            if let PredefinedMenuItemKind::Services = item_type {
                 // we have to assign an empty menu as the app's services menu, and macOS will populate it
                 let services_menu = NSMenu::new(mtm);
                 NSApplication::sharedApplication(mtm).setServicesMenu(Some(&services_menu));
@@ -883,29 +883,29 @@ impl MenuChild {
     }
 }
 
-impl PredefinedMenuItemType {
+impl PredefinedMenuItemKind {
     pub(crate) fn selector(&self) -> Option<Sel> {
         match self {
-            PredefinedMenuItemType::Separator => None,
-            PredefinedMenuItemType::Copy => Some(sel!(copy:)),
-            PredefinedMenuItemType::Cut => Some(sel!(cut:)),
-            PredefinedMenuItemType::Paste => Some(sel!(paste:)),
-            PredefinedMenuItemType::SelectAll => Some(sel!(selectAll:)),
-            PredefinedMenuItemType::Undo => Some(sel!(undo:)),
-            PredefinedMenuItemType::Redo => Some(sel!(redo:)),
-            PredefinedMenuItemType::Minimize => Some(sel!(performMiniaturize:)),
-            PredefinedMenuItemType::Maximize => Some(sel!(performZoom:)),
-            PredefinedMenuItemType::Fullscreen => Some(sel!(toggleFullScreen:)),
-            PredefinedMenuItemType::Hide => Some(sel!(hide:)),
-            PredefinedMenuItemType::HideOthers => Some(sel!(hideOtherApplications:)),
-            PredefinedMenuItemType::ShowAll => Some(sel!(unhideAllApplications:)),
-            PredefinedMenuItemType::CloseWindow => Some(sel!(performClose:)),
-            PredefinedMenuItemType::Quit => Some(sel!(terminate:)),
+            PredefinedMenuItemKind::Separator => None,
+            PredefinedMenuItemKind::Copy => Some(sel!(copy:)),
+            PredefinedMenuItemKind::Cut => Some(sel!(cut:)),
+            PredefinedMenuItemKind::Paste => Some(sel!(paste:)),
+            PredefinedMenuItemKind::SelectAll => Some(sel!(selectAll:)),
+            PredefinedMenuItemKind::Undo => Some(sel!(undo:)),
+            PredefinedMenuItemKind::Redo => Some(sel!(redo:)),
+            PredefinedMenuItemKind::Minimize => Some(sel!(performMiniaturize:)),
+            PredefinedMenuItemKind::Maximize => Some(sel!(performZoom:)),
+            PredefinedMenuItemKind::Fullscreen => Some(sel!(toggleFullScreen:)),
+            PredefinedMenuItemKind::Hide => Some(sel!(hide:)),
+            PredefinedMenuItemKind::HideOthers => Some(sel!(hideOtherApplications:)),
+            PredefinedMenuItemKind::ShowAll => Some(sel!(unhideAllApplications:)),
+            PredefinedMenuItemKind::CloseWindow => Some(sel!(performClose:)),
+            PredefinedMenuItemKind::Quit => Some(sel!(terminate:)),
             // manual implementation in `fire_menu_item_click`
-            PredefinedMenuItemType::About(_) => Some(sel!(fireMenuItemAction:)),
-            PredefinedMenuItemType::Services => None,
-            PredefinedMenuItemType::BringAllToFront => Some(sel!(arrangeInFront:)),
-            PredefinedMenuItemType::None => None,
+            PredefinedMenuItemKind::About(_) => Some(sel!(fireMenuItemAction:)),
+            PredefinedMenuItemKind::Services => None,
+            PredefinedMenuItemKind::BringAllToFront => Some(sel!(arrangeInFront:)),
+            PredefinedMenuItemKind::None => None,
         }
     }
 }
@@ -973,7 +973,7 @@ impl MenuItem {
         let item =
             unsafe { self.ivars().get().as_ref() }.expect("MenuItem's MenuChild pointer was unset");
 
-        if let Some(PredefinedMenuItemType::About(about_meta)) = &item.predefined_item_type {
+        if let Some(PredefinedMenuItemKind::About(about_meta)) = &item.predefined_item_kind {
             match about_meta {
                 Some(about_meta) => {
                     let mut keys: Vec<&NSString> = Default::default();
