@@ -20,7 +20,13 @@ use std::{
     rc::Rc,
 };
 
-use crate::{items::*, IsMenuItem, MenuItemKind, MenuItemType};
+#[cfg(feature = "ksni")]
+use std::sync::Arc;
+
+#[cfg(feature = "ksni")]
+use arc_swap::ArcSwap;
+
+use crate::{IsMenuItem, MenuItemKind};
 
 pub(crate) use self::platform::*;
 
@@ -32,49 +38,6 @@ impl dyn IsMenuItem + '_ {
             MenuItemKind::Predefined(i) => i.inner,
             MenuItemKind::Check(i) => i.inner,
             MenuItemKind::Icon(i) => i.inner,
-        }
-    }
-}
-
-/// Internal utilities
-impl MenuChild {
-    fn kind(&self, c: Rc<RefCell<MenuChild>>) -> MenuItemKind {
-        match self.item_type() {
-            MenuItemType::Submenu => {
-                let id = c.borrow().id().clone();
-                MenuItemKind::Submenu(Submenu {
-                    id: Rc::new(id),
-                    inner: c,
-                })
-            }
-            MenuItemType::MenuItem => {
-                let id = c.borrow().id().clone();
-                MenuItemKind::MenuItem(MenuItem {
-                    id: Rc::new(id),
-                    inner: c,
-                })
-            }
-            MenuItemType::Predefined => {
-                let id = c.borrow().id().clone();
-                MenuItemKind::Predefined(PredefinedMenuItem {
-                    id: Rc::new(id),
-                    inner: c,
-                })
-            }
-            MenuItemType::Check => {
-                let id = c.borrow().id().clone();
-                MenuItemKind::Check(CheckMenuItem {
-                    id: Rc::new(id),
-                    inner: c,
-                })
-            }
-            MenuItemType::Icon => {
-                let id = c.borrow().id().clone();
-                MenuItemKind::Icon(IconMenuItem {
-                    id: Rc::new(id),
-                    inner: c,
-                })
-            }
         }
     }
 }
@@ -108,6 +71,18 @@ impl MenuItemKind {
             MenuItemKind::Predefined(i) => i.inner.borrow_mut(),
             MenuItemKind::Check(i) => i.inner.borrow_mut(),
             MenuItemKind::Icon(i) => i.inner.borrow_mut(),
+        }
+    }
+
+    #[cfg(feature = "ksni")]
+    pub(crate) fn compat_child(&self) -> Arc<ArcSwap<crate::CompatMenuItem>> {
+        use crate::items::*;
+        match self {
+            MenuItemKind::MenuItem(i) => i.compat.clone(),
+            MenuItemKind::Submenu(i) => i.compat.clone(),
+            MenuItemKind::Predefined(i) => i.compat.clone(),
+            MenuItemKind::Check(i) => i.compat.clone(),
+            MenuItemKind::Icon(i) => i.compat.clone(),
         }
     }
 }

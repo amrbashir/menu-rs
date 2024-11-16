@@ -27,6 +27,12 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
 };
 
+#[cfg(feature = "ksni")]
+use std::sync::Arc;
+
+#[cfg(feature = "ksni")]
+use arc_swap::ArcSwap;
+
 static COUNTER: Counter = Counter::new();
 
 macro_rules! is_item_supported {
@@ -61,7 +67,7 @@ macro_rules! return_if_item_not_supported {
 
 pub struct Menu {
     id: MenuId,
-    children: Vec<Rc<RefCell<MenuChild>>>,
+    children: Vec<MenuItemKind>,
     // TODO: maybe save a reference to the window?
     gtk_menubars: HashMap<u32, gtk::MenuBar>,
     accel_group: Option<gtk::AccelGroup>,
@@ -123,8 +129,8 @@ impl Menu {
         }
 
         match op {
-            AddOp::Append => self.children.push(item.child()),
-            AddOp::Insert(position) => self.children.insert(position, item.child()),
+            AddOp::Append => self.children.push(item.kind()),
+            AddOp::Insert(position) => self.children.insert(position, item.kind()),
         }
 
         Ok(())
@@ -172,7 +178,7 @@ impl Menu {
             let index = self
                 .children
                 .iter()
-                .position(|e| e.borrow().id == item.id())
+                .position(|e| e.id() == item.id())
                 .ok_or(crate::Error::NotAChildOfThisMenu)?;
             if remove_from_cache {
                 self.children.remove(index)
@@ -191,9 +197,8 @@ impl Menu {
             if id.map(|i| i == *menu_id).unwrap_or(true) {
                 // bail this is not a supported item like a close_window predefined menu item
                 if is_item_supported!(item) {
-                    let mut child_ = child.borrow_mut();
-
-                    if child_.item_type == MenuItemType::Submenu {
+                    if let MenuItemKind::Submenu(child) = &child {
+                        let mut child_ = child.inner.borrow_mut();
                         let menus = child_.gtk_menus.as_ref().unwrap().get(menu_id).cloned();
                         if let Some(menus) = menus {
                             for (id, menu) in menus {
@@ -207,6 +212,9 @@ impl Menu {
                         }
                         child_.gtk_menus.as_mut().unwrap().remove(menu_id);
                     }
+
+                    let child = child.inner();
+                    let child_ = child.borrow();
 
                     // remove all the gtk items that are related to this gtk menubar and destroy it
                     if let Some(items) = child_.gtk_menu_items.borrow_mut().remove(menu_id) {
@@ -227,7 +235,8 @@ impl Menu {
         // remove from the gtk menu assigned to the context menu
         if remove_from_cache {
             if let (id, Some(menu)) = &self.gtk_menu {
-                let child_ = child.borrow_mut();
+                let child = child.inner();
+                let child_ = child.borrow();
                 if let Some(items) = child_.gtk_menu_items.borrow_mut().remove(id) {
                     for item in items {
                         menu.remove(&item);
@@ -245,10 +254,13 @@ impl Menu {
     }
 
     pub fn items(&self) -> Vec<MenuItemKind> {
-        self.children
-            .iter()
-            .map(|c| c.borrow().kind(c.clone()))
-            .collect()
+        self.children.to_vec()
+    }
+
+    /// Returns a list of menu items that has been added to this menu.
+    #[cfg(feature = "ksni")]
+    pub fn compat_items(&self) -> Vec<Arc<ArcSwap<crate::CompatMenuItem>>> {
+        self.children.iter().map(MenuItemKind::compat_child).collect()
     }
 
     pub fn init_for_gtk_window<W, C>(
@@ -420,7 +432,7 @@ pub struct MenuChild {
     pub(crate) icon: Option<Icon>,
 
     // submenu fields
-    pub children: Option<Vec<Rc<RefCell<MenuChild>>>>,
+    pub children: Option<Vec<MenuItemKind>>,
     gtk_menus: Option<HashMap<u32, Vec<(u32, gtk::Menu)>>>,
     gtk_menu: Option<(u32, Option<gtk::Menu>)>, // dedicated menu for tray or context menus
     accel_group: Option<gtk::AccelGroup>,
@@ -458,9 +470,10 @@ impl Drop for MenuChild {
 fn drop_children_from_menu_and_destroy(
     id: u32,
     menu: &impl IsA<Container>,
-    children: &Vec<Rc<RefCell<MenuChild>>>,
+    children: &[MenuItemKind],
 ) {
     for child in children {
+        let child = child.inner();
         let mut child_ = child.borrow_mut();
         {
             let mut menu_items = child_.gtk_menu_items.borrow_mut();
@@ -809,12 +822,12 @@ impl MenuChild {
         }
 
         match op {
-            AddOp::Append => self.children.as_mut().unwrap().push(item.child()),
+            AddOp::Append => self.children.as_mut().unwrap().push(item.kind()),
             AddOp::Insert(position) => self
                 .children
                 .as_mut()
                 .unwrap()
-                .insert(position, item.child()),
+                .insert(position, item.kind()),
         }
 
         Ok(())
@@ -866,7 +879,7 @@ impl MenuChild {
                 .as_ref()
                 .unwrap()
                 .iter()
-                .position(|e| e.borrow().id == item.id())
+                .position(|e| e.id() == item.id())
                 .ok_or(crate::Error::NotAChildOfThisMenu)?;
             if remove_from_cache {
                 self.children.as_mut().unwrap().remove(index)
@@ -886,9 +899,8 @@ impl MenuChild {
                 if id.map(|i| i == *menu_id).unwrap_or(true) {
                     // bail this is not a supported item like a close_window predefined menu item
                     if is_item_supported!(item) {
-                        let mut child_ = child.borrow_mut();
-
-                        if child_.item_type == MenuItemType::Submenu {
+                        if let MenuItemKind::Submenu(child) = &child {
+                            let mut child_ = child.inner.borrow_mut();
                             let menus = child_.gtk_menus.as_ref().unwrap().get(menu_id).cloned();
                             if let Some(menus) = menus {
                                 for (id, menu) in menus {
@@ -903,6 +915,9 @@ impl MenuChild {
                             child_.gtk_menus.as_mut().unwrap().remove(menu_id);
                         }
 
+                        let child = child.inner();
+                        let child_ = child.borrow();
+    
                         // remove all the gtk items that are related to this gtk menu and destroy it
                         if let Some(items) = child_.gtk_menu_items.borrow_mut().remove(menu_id) {
                             for item in items {
@@ -923,7 +938,8 @@ impl MenuChild {
         // remove from the gtk menu assigned to the context menu
         if remove_from_cache {
             if let (id, Some(menu)) = self.gtk_menu.as_ref().unwrap() {
-                let child_ = child.borrow_mut();
+                let child = child.inner();
+                let child_ = child.borrow();
                 if let Some(items) = child_.gtk_menu_items.borrow_mut().remove(id) {
                     for item in items {
                         menu.remove(&item);
@@ -945,8 +961,16 @@ impl MenuChild {
         self.children
             .as_ref()
             .unwrap()
+            .to_vec()
+    }
+
+    #[cfg(feature = "ksni")]
+    pub fn compat_items(&self) -> Vec<Arc<ArcSwap<crate::CompatMenuItem>>> {
+        self.children
+            .as_ref()
+            .unwrap()
             .iter()
-            .map(|c| c.borrow().kind(c.clone()))
+            .map(MenuItemKind::compat_child)
             .collect()
     }
 

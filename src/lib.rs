@@ -153,6 +153,14 @@
 //! [winit]: https://docs.rs/winit
 //! [tao]: https://docs.rs/tao
 
+use std::{cell::RefCell, rc::Rc};
+
+#[cfg(feature = "ksni")]
+use std::sync::Arc;
+
+#[cfg(feature = "ksni")]
+use arc_swap::ArcSwap;
+
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use once_cell::sync::{Lazy, OnceCell};
 
@@ -179,9 +187,11 @@ pub use menu_id::MenuId;
 #[cfg(target_os = "linux")]
 pub use platform_impl::AboutDialog;
 
+use platform_impl::MenuChild;
+
 /// An enumeration of all available menu types, useful to match against
 /// the items returned from [`Menu::items`] or [`Submenu::items`]
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum MenuItemKind {
     MenuItem(MenuItem),
     Submenu(Submenu),
@@ -292,6 +302,17 @@ impl MenuItemKind {
             MenuItemKind::Icon(i) => i.into_id(),
         }
     }
+
+    /// Get the menu items inner value
+    pub(crate) fn inner(&self) -> Rc<RefCell<MenuChild>> {
+        match self {
+            MenuItemKind::MenuItem(i) => i.inner.clone(),
+            MenuItemKind::Submenu(i) => i.inner.clone(),
+            MenuItemKind::Predefined(i) => i.inner.clone(),
+            MenuItemKind::Check(i) => i.inner.clone(),
+            MenuItemKind::Icon(i) => i.inner.clone(),
+        }
+    }
 }
 
 /// A trait that defines a generic item in a menu, which may be one of [`MenuItemKind`]
@@ -392,7 +413,8 @@ pub trait ContextMenu {
     fn gtk_context_menu(&self) -> gtk::Menu;
 
     /// Get all menu items within this context menu.
-    fn items(&self) -> Vec<MenuItemKind>;
+    #[cfg(feature = "ksni")]
+    fn compat_items(&self) -> Vec<Arc<ArcSwap<crate::CompatMenuItem>>>;
 
     /// Shows this menu as a context menu for the specified `NSView`.
     ///
@@ -470,4 +492,17 @@ impl MenuEvent {
             let _ = MENU_CHANNEL.0.send(event);
         }
     }
+}
+
+#[cfg(feature = "ksni")]
+static MENU_UPDATE_CHANNEL: Lazy<(Sender<()>, Receiver<()>)> = Lazy::new(unbounded);
+
+#[cfg(feature = "ksni")]
+pub fn recv_menu_update() -> std::result::Result<(), crossbeam_channel::RecvError> {
+    MENU_UPDATE_CHANNEL.1.recv()
+}
+
+#[cfg(feature = "ksni")]
+pub(crate) fn send_menu_update() {
+    let _ = MENU_UPDATE_CHANNEL.0.send(());
 }

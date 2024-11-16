@@ -4,6 +4,12 @@
 
 use std::{cell::RefCell, mem, rc::Rc};
 
+#[cfg(feature = "ksni")]
+use std::sync::Arc;
+
+#[cfg(feature = "ksni")]
+use arc_swap::ArcSwap;
+
 use crate::{accelerator::Accelerator, sealed::IsMenuItemBase, IsMenuItem, MenuId, MenuItemKind};
 
 /// A check menu item inside a [`Menu`] or [`Submenu`]
@@ -12,10 +18,12 @@ use crate::{accelerator::Accelerator, sealed::IsMenuItemBase, IsMenuItem, MenuId
 ///
 /// [`Menu`]: crate::Menu
 /// [`Submenu`]: crate::Submenu
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct CheckMenuItem {
     pub(crate) id: Rc<MenuId>,
     pub(crate) inner: Rc<RefCell<crate::platform_impl::MenuChild>>,
+    #[cfg(feature = "ksni")]
+    pub(crate) compat: Arc<ArcSwap<crate::CompatMenuItem>>,
 }
 
 impl IsMenuItemBase for CheckMenuItem {}
@@ -34,6 +42,18 @@ impl IsMenuItem for CheckMenuItem {
 }
 
 impl CheckMenuItem {
+    #[cfg(feature = "ksni")]
+    pub(crate) fn compat_menu_item(
+        item: &crate::platform_impl::MenuChild,
+    ) -> crate::CompatMenuItem {
+        crate::CompatCheckmarkItem {
+            id: item.id().0.clone(),
+            label: super::strip_accelerator(item.text()),
+            enabled: item.is_enabled(),
+            checked: item.is_checked(),
+        }.into()
+    }
+
     /// Create a new check menu item.
     ///
     /// - `text` could optionally contain an `&` before a character to assign this character as the mnemonic
@@ -44,16 +64,22 @@ impl CheckMenuItem {
         checked: bool,
         accelerator: Option<Accelerator>,
     ) -> Self {
-        let item = crate::platform_impl::MenuChild::new_check(
+        let inner = crate::platform_impl::MenuChild::new_check(
             text.as_ref(),
             enabled,
             checked,
             accelerator,
             None,
         );
+
+        #[cfg(feature = "ksni")]
+        let compat = Self::compat_menu_item(&inner);
+
         Self {
-            id: Rc::new(item.id().clone()),
-            inner: Rc::new(RefCell::new(item)),
+            id: Rc::new(inner.id().clone()),
+            inner: Rc::new(RefCell::new(inner)),
+            #[cfg(feature = "ksni")]
+            compat: Arc::new(ArcSwap::from_pointee(compat)),
         }
     }
 
@@ -69,15 +95,22 @@ impl CheckMenuItem {
         accelerator: Option<Accelerator>,
     ) -> Self {
         let id = id.into();
+        let inner = crate::platform_impl::MenuChild::new_check(
+            text.as_ref(),
+            enabled,
+            checked,
+            accelerator,
+            Some(id.clone()),
+        );
+
+        #[cfg(feature = "ksni")]
+        let compat = Self::compat_menu_item(&inner);
+
         Self {
-            id: Rc::new(id.clone()),
-            inner: Rc::new(RefCell::new(crate::platform_impl::MenuChild::new_check(
-                text.as_ref(),
-                enabled,
-                checked,
-                accelerator,
-                Some(id),
-            ))),
+            id: Rc::new(id),
+            inner: Rc::new(RefCell::new(inner)),
+            #[cfg(feature = "ksni")]
+            compat: Arc::new(ArcSwap::from_pointee(compat)),
         }
     }
 
@@ -95,7 +128,14 @@ impl CheckMenuItem {
     /// an `&` before a character to assign this character as the mnemonic
     /// for this check menu item. To display a `&` without assigning a mnemenonic, use `&&`.
     pub fn set_text<S: AsRef<str>>(&self, text: S) {
-        self.inner.borrow_mut().set_text(text.as_ref())
+        let mut inner = self.inner.borrow_mut();
+        inner.set_text(text.as_ref());
+
+        #[cfg(feature = "ksni")]
+        self.compat.store(Arc::new(Self::compat_menu_item(&inner)));
+        
+        #[cfg(feature = "ksni")]
+        crate::send_menu_update();
     }
 
     /// Get whether this check menu item is enabled or not.
@@ -105,7 +145,14 @@ impl CheckMenuItem {
 
     /// Enable or disable this check menu item.
     pub fn set_enabled(&self, enabled: bool) {
-        self.inner.borrow_mut().set_enabled(enabled)
+        let mut inner = self.inner.borrow_mut();
+        inner.set_enabled(enabled);
+
+        #[cfg(feature = "ksni")]
+        self.compat.store(Arc::new(Self::compat_menu_item(&inner)));
+        
+        #[cfg(feature = "ksni")]
+        crate::send_menu_update();
     }
 
     /// Set this check menu item accelerator.
@@ -120,7 +167,14 @@ impl CheckMenuItem {
 
     /// Check or Uncheck this check menu item.
     pub fn set_checked(&self, checked: bool) {
-        self.inner.borrow_mut().set_checked(checked)
+        let mut inner = self.inner.borrow_mut();
+        inner.set_checked(checked);
+
+        #[cfg(feature = "ksni")]
+        self.compat.store(Arc::new(Self::compat_menu_item(&inner)));
+        
+        #[cfg(feature = "ksni")]
+        crate::send_menu_update();
     }
 
     /// Convert this menu item into its menu ID.

@@ -4,6 +4,12 @@
 
 use std::{cell::RefCell, mem, rc::Rc};
 
+#[cfg(feature = "ksni")]
+use std::sync::Arc;
+
+#[cfg(feature = "ksni")]
+use arc_swap::ArcSwap;
+
 use crate::{
     accelerator::{Accelerator, CMD_OR_CTRL},
     sealed::IsMenuItemBase,
@@ -12,10 +18,12 @@ use crate::{
 use keyboard_types::{Code, Modifiers};
 
 /// A predefined (native) menu item which has a predfined behavior by the OS or by this crate.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct PredefinedMenuItem {
     pub(crate) id: Rc<MenuId>,
     pub(crate) inner: Rc<RefCell<crate::platform_impl::MenuChild>>,
+    #[cfg(feature = "ksni")]
+    pub(crate) compat: Arc<ArcSwap<crate::CompatMenuItem>>,
 }
 
 impl IsMenuItemBase for PredefinedMenuItem {}
@@ -34,6 +42,31 @@ impl IsMenuItem for PredefinedMenuItem {
 }
 
 impl PredefinedMenuItem {
+    #[cfg(feature = "ksni")]
+    pub(crate) fn compat_menu_item(
+        item: &crate::platform_impl::MenuChild,
+    ) -> crate::CompatMenuItem {
+        match &item.predefined_item_kind {
+            Some(PredefinedMenuItemKind::Separator) => crate::CompatMenuItem::Separator,
+            Some(predefined_menu_item_kind) => crate::CompatStandardItem {
+                id: item.id().0.clone(),
+                label: super::strip_accelerator(item.text()),
+                enabled: true,
+                icon: None,
+                predefined_menu_item_kind: Some(predefined_menu_item_kind.clone()),
+            }
+            .into(),
+            _ => crate::CompatStandardItem {
+                id: item.id().0.clone(),
+                label: super::strip_accelerator(item.text()),
+                enabled: true,
+                icon: None,
+                predefined_menu_item_kind: None,
+            }
+            .into(),
+        }
+    }
+
     /// The kind of predefined menu item
     pub fn predefined_item_kind(&self) -> Option<PredefinedMenuItemKind> {
         self.inner.borrow().predefined_item_kind.clone()
@@ -177,13 +210,19 @@ impl PredefinedMenuItem {
     }
 
     fn new<S: AsRef<str>>(item: PredefinedMenuItemKind, text: Option<S>) -> Self {
-        let item = crate::platform_impl::MenuChild::new_predefined(
+        let inner = crate::platform_impl::MenuChild::new_predefined(
             item,
             text.map(|t| t.as_ref().to_string()),
         );
+
+        #[cfg(feature = "ksni")]
+        let compat = Self::compat_menu_item(&inner);
+
         Self {
-            id: Rc::new(item.id().clone()),
-            inner: Rc::new(RefCell::new(item)),
+            id: Rc::new(inner.id().clone()),
+            inner: Rc::new(RefCell::new(inner)),
+            #[cfg(feature = "ksni")]
+            compat: Arc::new(ArcSwap::from_pointee(compat)),
         }
     }
 
@@ -199,7 +238,14 @@ impl PredefinedMenuItem {
 
     /// Set the text for this predefined menu item.
     pub fn set_text<S: AsRef<str>>(&self, text: S) {
-        self.inner.borrow_mut().set_text(text.as_ref())
+        let mut inner = self.inner.borrow_mut();
+        inner.set_text(text.as_ref());
+
+        #[cfg(feature = "ksni")]
+        self.compat.store(Arc::new(Self::compat_menu_item(&inner)));
+        
+        #[cfg(feature = "ksni")]
+        crate::send_menu_update();
     }
 
     /// Convert this menu item into its menu ID.

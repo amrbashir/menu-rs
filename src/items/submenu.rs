@@ -4,6 +4,12 @@
 
 use std::{cell::RefCell, mem, rc::Rc};
 
+#[cfg(feature = "ksni")]
+use std::sync::Arc;
+
+#[cfg(feature = "ksni")]
+use arc_swap::ArcSwap;
+
 use crate::{
     dpi::Position, sealed::IsMenuItemBase, util::AddOp, ContextMenu, IsMenuItem, MenuId,
     MenuItemKind,
@@ -12,10 +18,12 @@ use crate::{
 /// A menu that can be added to a [`Menu`] or another [`Submenu`].
 ///
 /// [`Menu`]: crate::Menu
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Submenu {
     pub(crate) id: Rc<MenuId>,
     pub(crate) inner: Rc<RefCell<crate::platform_impl::MenuChild>>,
+    #[cfg(feature = "ksni")]
+    pub(crate) compat: Arc<ArcSwap<crate::CompatMenuItem>>,
 }
 
 impl IsMenuItemBase for Submenu {}
@@ -34,15 +42,33 @@ impl IsMenuItem for Submenu {
 }
 
 impl Submenu {
+    #[cfg(feature = "ksni")]
+    pub(crate) fn compat_menu_item(
+        item: &crate::platform_impl::MenuChild,
+    ) -> crate::CompatMenuItem {
+        crate::CompatSubMenuItem {
+            label: super::strip_accelerator(item.text()),
+            enabled: item.is_enabled(),
+            submenu: item.compat_items(),
+        }
+        .into()
+    }
+
     /// Create a new submenu.
     ///
     /// - `text` could optionally contain an `&` before a character to assign this character as the mnemonic
     ///   for this submenu. To display a `&` without assigning a mnemenonic, use `&&`.
     pub fn new<S: AsRef<str>>(text: S, enabled: bool) -> Self {
-        let submenu = crate::platform_impl::MenuChild::new_submenu(text.as_ref(), enabled, None);
+        let item = crate::platform_impl::MenuChild::new_submenu(text.as_ref(), enabled, None);
+
+        #[cfg(feature = "ksni")]
+        let compat = Self::compat_menu_item(&item);
+
         Self {
-            id: Rc::new(submenu.id().clone()),
-            inner: Rc::new(RefCell::new(submenu)),
+            id: Rc::new(item.id().clone()),
+            inner: Rc::new(RefCell::new(item)),
+            #[cfg(feature = "ksni")]
+            compat: Arc::new(ArcSwap::from_pointee(compat)),
         }
     }
 
@@ -52,14 +78,17 @@ impl Submenu {
     ///   for this submenu. To display a `&` without assigning a mnemenonic, use `&&`.
     pub fn with_id<I: Into<MenuId>, S: AsRef<str>>(id: I, text: S, enabled: bool) -> Self {
         let id = id.into();
+        let item =
+            crate::platform_impl::MenuChild::new_submenu(text.as_ref(), enabled, Some(id.clone()));
+
+        #[cfg(feature = "ksni")]
+        let compat = Self::compat_menu_item(&item);
 
         Self {
-            id: Rc::new(id.clone()),
-            inner: Rc::new(RefCell::new(crate::platform_impl::MenuChild::new_submenu(
-                text.as_ref(),
-                enabled,
-                Some(id),
-            ))),
+            id: Rc::new(id),
+            inner: Rc::new(RefCell::new(item)),
+            #[cfg(feature = "ksni")]
+            compat: Arc::new(ArcSwap::from_pointee(compat)),
         }
     }
 
@@ -93,7 +122,16 @@ impl Submenu {
 
     /// Add a menu item to the end of this menu.
     pub fn append(&self, item: &dyn IsMenuItem) -> crate::Result<()> {
-        self.inner.borrow_mut().add_menu_item(item, AddOp::Append)
+        let mut inner = self.inner.borrow_mut();
+        inner.add_menu_item(item, AddOp::Append)?;
+
+        #[cfg(feature = "ksni")]
+        self.compat.store(Arc::new(Self::compat_menu_item(&inner)));
+        
+        #[cfg(feature = "ksni")]
+        crate::send_menu_update();
+
+        Ok(())
     }
 
     /// Add menu items to the end of this submenu. It calls [`Submenu::append`] in a loop.
@@ -107,9 +145,16 @@ impl Submenu {
 
     /// Add a menu item to the beginning of this submenu.
     pub fn prepend(&self, item: &dyn IsMenuItem) -> crate::Result<()> {
-        self.inner
-            .borrow_mut()
-            .add_menu_item(item, AddOp::Insert(0))
+        let mut inner = self.inner.borrow_mut();
+        inner.add_menu_item(item, AddOp::Insert(0))?;
+
+        #[cfg(feature = "ksni")]
+        self.compat.store(Arc::new(Self::compat_menu_item(&inner)));
+        
+        #[cfg(feature = "ksni")]
+        crate::send_menu_update();
+
+        Ok(())
     }
 
     /// Add menu items to the beginning of this submenu.
@@ -121,9 +166,16 @@ impl Submenu {
 
     /// Insert a menu item at the specified `postion` in the submenu.
     pub fn insert(&self, item: &dyn IsMenuItem, position: usize) -> crate::Result<()> {
-        self.inner
-            .borrow_mut()
-            .add_menu_item(item, AddOp::Insert(position))
+        let mut inner = self.inner.borrow_mut();
+        inner.add_menu_item(item, AddOp::Insert(position))?;
+
+        #[cfg(feature = "ksni")]
+        self.compat.store(Arc::new(Self::compat_menu_item(&inner)));
+        
+        #[cfg(feature = "ksni")]
+        crate::send_menu_update();
+
+        Ok(())
     }
 
     /// Insert menu items at the specified `postion` in the submenu.
@@ -137,7 +189,16 @@ impl Submenu {
 
     /// Remove a menu item from this submenu.
     pub fn remove(&self, item: &dyn IsMenuItem) -> crate::Result<()> {
-        self.inner.borrow_mut().remove(item)
+        let mut inner = self.inner.borrow_mut();
+        inner.remove(item)?;
+
+        #[cfg(feature = "ksni")]
+        self.compat.store(Arc::new(Self::compat_menu_item(&inner)));
+        
+        #[cfg(feature = "ksni")]
+        crate::send_menu_update();
+
+        Ok(())
     }
 
     /// Remove the menu item at the specified position from this submenu and returns it.
@@ -166,7 +227,14 @@ impl Submenu {
     /// an `&` before a character to assign this character as the mnemonic
     /// for this submenu. To display a `&` without assigning a mnemenonic, use `&&`.
     pub fn set_text<S: AsRef<str>>(&self, text: S) {
-        self.inner.borrow_mut().set_text(text.as_ref())
+        let mut inner = self.inner.borrow_mut();
+        inner.set_text(text.as_ref());
+
+        #[cfg(feature = "ksni")]
+        self.compat.store(Arc::new(Self::compat_menu_item(&inner)));
+        
+        #[cfg(feature = "ksni")]
+        crate::send_menu_update();
     }
 
     /// Get whether this submenu is enabled or not.
@@ -176,7 +244,14 @@ impl Submenu {
 
     /// Enable or disable this submenu.
     pub fn set_enabled(&self, enabled: bool) {
-        self.inner.borrow_mut().set_enabled(enabled)
+        let mut inner = self.inner.borrow_mut();
+        inner.set_enabled(enabled);
+
+        #[cfg(feature = "ksni")]
+        self.compat.store(Arc::new(Self::compat_menu_item(&inner)));
+        
+        #[cfg(feature = "ksni")]
+        crate::send_menu_update();
     }
 
     /// Set this submenu as the Window menu for the application on macOS.
@@ -185,7 +260,14 @@ impl Submenu {
     /// certain other items to the menu.
     #[cfg(target_os = "macos")]
     pub fn set_as_windows_menu_for_nsapp(&self) {
-        self.inner.borrow_mut().set_as_windows_menu_for_nsapp()
+        let mut inner = self.inner.borrow_mut();
+        inner.set_as_windows_menu_for_nsapp();
+
+        #[cfg(feature = "ksni")]
+        self.compat.store(Arc::new(Self::compat_menu_item(&inner)));
+        
+        #[cfg(feature = "ksni")]
+        crate::send_menu_update();
     }
 
     /// Set this submenu as the Help menu for the application on macOS.
@@ -196,7 +278,14 @@ impl Submenu {
     /// which has a title matching the localized word "Help".
     #[cfg(target_os = "macos")]
     pub fn set_as_help_menu_for_nsapp(&self) {
-        self.inner.borrow_mut().set_as_help_menu_for_nsapp()
+        let mut inner = self.inner.borrow_mut();
+        inner.set_as_help_menu_for_nsapp();
+
+        #[cfg(feature = "ksni")]
+        self.compat.store(Arc::new(Self::compat_menu_item(&inner)));
+        
+        #[cfg(feature = "ksni")]
+        crate::send_menu_update();
     }
 
     /// Convert this submenu into its menu ID.
@@ -249,8 +338,9 @@ impl ContextMenu for Submenu {
         self.inner.borrow_mut().gtk_context_menu()
     }
 
-    fn items(&self) -> Vec<MenuItemKind> {
-        self.inner.borrow_mut().items()
+    #[cfg(feature = "ksni")]
+    fn compat_items(&self) -> Vec<Arc<ArcSwap<crate::CompatMenuItem>>> {
+        self.inner.borrow_mut().compat_items()
     }
 
     #[cfg(target_os = "macos")]
