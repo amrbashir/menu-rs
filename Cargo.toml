@@ -69,7 +69,7 @@ objc2-app-kit = { version = "0.2.2", features = [
 png = "0.17"
 
 [dev-dependencies]
-winit = "0.29"
+winit = "0.30"
 tao = "0.30"
 wry = "0.45"
 image = "0.25"
