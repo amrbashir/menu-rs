@@ -103,6 +103,8 @@ impl Accelerator {
             Code::F22 => "\u{F719}".into(),
             Code::F23 => "\u{F71A}".into(),
             Code::F24 => "\u{F71B}".into(),
+            Code::NumpadAdd => "+".into(),
+            Code::NumpadSubtract => "-".into(),
             key => return Err(AcceleratorParseError::UnsupportedKey(key.to_string())),
         })
     }
