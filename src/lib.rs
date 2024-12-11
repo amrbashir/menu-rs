@@ -495,14 +495,19 @@ impl MenuEvent {
 }
 
 #[cfg(feature = "ksni")]
-static MENU_UPDATE_CHANNEL: Lazy<(Sender<()>, Receiver<()>)> = Lazy::new(unbounded);
+static MENU_UPDATE_CHANNEL: Lazy<(Sender<std::ops::ControlFlow<()>>, Receiver<std::ops::ControlFlow<()>>)> = Lazy::new(unbounded);
 
 #[cfg(feature = "ksni")]
-pub fn recv_menu_update() -> std::result::Result<(), crossbeam_channel::RecvError> {
+pub fn recv_menu_update() -> std::result::Result<std::ops::ControlFlow<()>, crossbeam_channel::RecvError> {
     MENU_UPDATE_CHANNEL.1.recv()
 }
 
 #[cfg(feature = "ksni")]
-pub(crate) fn send_menu_update() {
-    let _ = MENU_UPDATE_CHANNEL.0.send(());
+pub fn send_menu_update() {
+    let _ = MENU_UPDATE_CHANNEL.0.send(std::ops::ControlFlow::Continue(()));
+}
+
+#[cfg(feature = "ksni")]
+pub fn send_menu_shutdown() {
+    let _ = MENU_UPDATE_CHANNEL.0.send(std::ops::ControlFlow::Break(()));
 }

@@ -261,12 +261,6 @@ impl IconMenuItem {
     pub fn set_native_icon(&self, icon: Option<NativeIcon>) {
         let mut item = self.inner.borrow_mut();
         item.set_native_icon(icon);
-
-        #[cfg(feature = "ksni")]
-        self.compat.store(Arc::new(Self::compat_menu_item(&item)));
-        
-        #[cfg(feature = "ksni")]
-        crate::send_menu_update();
     }
 
     /// Change this menu item icon to a native image or remove it.
