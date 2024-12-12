@@ -257,19 +257,10 @@ impl IconMenuItem {
     /// ## Platform-specific:
     ///
     /// - **Windows / Linux**: Unsupported.
-    #[cfg(target_os = "macos")]
-    pub fn set_native_icon(&self, icon: Option<NativeIcon>) {
-        let mut item = self.inner.borrow_mut();
-        item.set_native_icon(icon);
+    pub fn set_native_icon(&self, _icon: Option<NativeIcon>) {
+        #[cfg(target_os = "macos")]
+        self.inner.borrow_mut().set_native_icon(_icon);
     }
-
-    /// Change this menu item icon to a native image or remove it.
-    ///
-    /// ## Platform-specific:
-    ///
-    /// - **Windows / Linux**: Unsupported.
-    #[cfg(not(target_os = "macos"))]
-    pub fn set_native_icon(&self, _icon: Option<NativeIcon>) {}
 
     /// Convert this menu item into its menu ID.
     pub fn into_id(mut self) -> MenuId {
