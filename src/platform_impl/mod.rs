@@ -20,10 +20,10 @@ use std::{
     rc::Rc,
 };
 
-#[cfg(feature = "ksni")]
+#[cfg(all(feature = "ksni", target_os = "linux"))]
 use std::sync::Arc;
 
-#[cfg(feature = "ksni")]
+#[cfg(all(feature = "ksni", target_os = "linux"))]
 use arc_swap::ArcSwap;
 
 use crate::{IsMenuItem, MenuItemKind};
@@ -74,7 +74,7 @@ impl MenuItemKind {
         }
     }
 
-    #[cfg(feature = "ksni")]
+    #[cfg(all(feature = "ksni", target_os = "linux"))]
     pub(crate) fn compat_child(&self) -> Arc<ArcSwap<crate::CompatMenuItem>> {
         use crate::items::*;
         match self {

@@ -1,9 +1,9 @@
 use std::{cell::RefCell, mem, rc::Rc};
 
-#[cfg(feature = "ksni")]
+#[cfg(all(feature = "ksni", target_os = "linux"))]
 use std::sync::Arc;
 
-#[cfg(feature = "ksni")]
+#[cfg(all(feature = "ksni", target_os = "linux"))]
 use arc_swap::ArcSwap;
 
 use crate::{
@@ -18,7 +18,7 @@ use crate::{
 pub struct MenuItem {
     pub(crate) id: Rc<MenuId>,
     pub(crate) inner: Rc<RefCell<crate::platform_impl::MenuChild>>,
-    #[cfg(feature = "ksni")]
+    #[cfg(all(feature = "ksni", target_os = "linux"))]
     pub(crate) compat: Arc<ArcSwap<crate::CompatMenuItem>>,
 }
 
@@ -38,7 +38,7 @@ impl IsMenuItem for MenuItem {
 }
 
 impl MenuItem {
-    #[cfg(feature = "ksni")]
+    #[cfg(all(feature = "ksni", target_os = "linux"))]
     pub(crate) fn compat_menu_item(
         item: &crate::platform_impl::MenuChild,
     ) -> crate::CompatMenuItem {
@@ -59,13 +59,13 @@ impl MenuItem {
     pub fn new<S: AsRef<str>>(text: S, enabled: bool, accelerator: Option<Accelerator>) -> Self {
         let inner = crate::platform_impl::MenuChild::new(text.as_ref(), enabled, accelerator, None);
 
-        #[cfg(feature = "ksni")]
+        #[cfg(all(feature = "ksni", target_os = "linux"))]
         let compat = Self::compat_menu_item(&inner);
 
         Self {
             id: Rc::new(inner.id().clone()),
             inner: Rc::new(RefCell::new(inner)),
-            #[cfg(feature = "ksni")]
+            #[cfg(all(feature = "ksni", target_os = "linux"))]
             compat: Arc::new(ArcSwap::from_pointee(compat)),
         }
     }
@@ -88,13 +88,13 @@ impl MenuItem {
             Some(id.clone()),
         );
 
-        #[cfg(feature = "ksni")]
+        #[cfg(all(feature = "ksni", target_os = "linux"))]
         let compat = Self::compat_menu_item(&inner);
 
         Self {
             id: Rc::new(id),
             inner: Rc::new(RefCell::new(inner)),
-            #[cfg(feature = "ksni")]
+            #[cfg(all(feature = "ksni", target_os = "linux"))]
             compat: Arc::new(ArcSwap::from_pointee(compat)),
         }
     }
@@ -116,10 +116,10 @@ impl MenuItem {
         let mut inner = self.inner.borrow_mut();
         inner.set_text(text.as_ref());
 
-        #[cfg(feature = "ksni")]
+        #[cfg(all(feature = "ksni", target_os = "linux"))]
         self.compat.store(Arc::new(Self::compat_menu_item(&inner)));
 
-        #[cfg(feature = "ksni")]
+        #[cfg(all(feature = "ksni", target_os = "linux"))]
         crate::send_menu_update();
     }
 
@@ -133,10 +133,10 @@ impl MenuItem {
         let mut inner = self.inner.borrow_mut();
         inner.set_enabled(enabled);
 
-        #[cfg(feature = "ksni")]
+        #[cfg(all(feature = "ksni", target_os = "linux"))]
         self.compat.store(Arc::new(Self::compat_menu_item(&inner)));
 
-        #[cfg(feature = "ksni")]
+        #[cfg(all(feature = "ksni", target_os = "linux"))]
         crate::send_menu_update();
     }
 
