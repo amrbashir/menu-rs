@@ -47,7 +47,7 @@ impl Submenu {
         item: &crate::platform_impl::MenuChild,
     ) -> crate::CompatMenuItem {
         crate::CompatSubMenuItem {
-            label: super::strip_accelerator(item.text()),
+            label: super::strip_mnemonic(item.text()),
             enabled: item.is_enabled(),
             submenu: item.compat_items(),
         }

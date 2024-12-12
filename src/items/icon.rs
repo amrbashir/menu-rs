@@ -52,7 +52,7 @@ impl IconMenuItem {
     ) -> crate::CompatMenuItem {
         crate::CompatStandardItem {
             id: item.id().0.clone(),
-            label: super::strip_accelerator(item.text()),
+            label: super::strip_mnemonic(item.text()),
             enabled: item.is_enabled(),
             icon: item
                 .icon

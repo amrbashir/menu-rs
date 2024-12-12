@@ -55,6 +55,9 @@ impl From<CompatSubMenuItem> for CompatMenuItem {
     }
 }
 
-pub fn strip_accelerator(text: impl AsRef<str>) -> String {
-    text.as_ref().replace('&', "")
+pub fn strip_mnemonic(text: impl AsRef<str>) -> String {
+    text.as_ref()
+        .replace("&&", "[~~]")
+        .replace('&', "")
+        .replace("[~~]", "&")
 }

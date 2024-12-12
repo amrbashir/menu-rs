@@ -48,7 +48,7 @@ impl CheckMenuItem {
     ) -> crate::CompatMenuItem {
         crate::CompatCheckmarkItem {
             id: item.id().0.clone(),
-            label: super::strip_accelerator(item.text()),
+            label: super::strip_mnemonic(item.text()),
             enabled: item.is_enabled(),
             checked: item.is_checked(),
         }.into()

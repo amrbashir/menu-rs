@@ -50,7 +50,7 @@ impl PredefinedMenuItem {
             Some(PredefinedMenuItemKind::Separator) => crate::CompatMenuItem::Separator,
             Some(predefined_menu_item_kind) => crate::CompatStandardItem {
                 id: item.id().0.clone(),
-                label: super::strip_accelerator(item.text()),
+                label: super::strip_mnemonic(item.text()),
                 enabled: true,
                 icon: None,
                 predefined_menu_item_kind: Some(predefined_menu_item_kind.clone()),
@@ -58,7 +58,7 @@ impl PredefinedMenuItem {
             .into(),
             _ => crate::CompatStandardItem {
                 id: item.id().0.clone(),
-                label: super::strip_accelerator(item.text()),
+                label: super::strip_mnemonic(item.text()),
                 enabled: true,
                 icon: None,
                 predefined_menu_item_kind: None,
