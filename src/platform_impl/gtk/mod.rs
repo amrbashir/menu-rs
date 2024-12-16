@@ -260,7 +260,10 @@ impl Menu {
     /// Returns a list of menu items that has been added to this menu.
     #[cfg(feature = "ksni")]
     pub fn compat_items(&self) -> Vec<Arc<ArcSwap<crate::CompatMenuItem>>> {
-        self.children.iter().map(MenuItemKind::compat_child).collect()
+        self.children
+            .iter()
+            .map(MenuItemKind::compat_child)
+            .collect()
     }
 
     pub fn init_for_gtk_window<W, C>(
@@ -917,7 +920,7 @@ impl MenuChild {
 
                         let child = child.inner();
                         let child_ = child.borrow();
-    
+
                         // remove all the gtk items that are related to this gtk menu and destroy it
                         if let Some(items) = child_.gtk_menu_items.borrow_mut().remove(menu_id) {
                             for item in items {
@@ -958,10 +961,7 @@ impl MenuChild {
     }
 
     pub fn items(&self) -> Vec<MenuItemKind> {
-        self.children
-            .as_ref()
-            .unwrap()
-            .to_vec()
+        self.children.as_ref().unwrap().to_vec()
     }
 
     #[cfg(feature = "ksni")]

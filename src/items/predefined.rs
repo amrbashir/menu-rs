@@ -243,7 +243,7 @@ impl PredefinedMenuItem {
 
         #[cfg(all(feature = "ksni", target_os = "linux"))]
         self.compat.store(Arc::new(Self::compat_menu_item(&inner)));
-        
+
         #[cfg(all(feature = "ksni", target_os = "linux"))]
         crate::send_menu_update();
     }

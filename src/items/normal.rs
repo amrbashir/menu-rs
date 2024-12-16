@@ -6,9 +6,7 @@ use std::sync::Arc;
 #[cfg(all(feature = "ksni", target_os = "linux"))]
 use arc_swap::ArcSwap;
 
-use crate::{
-    accelerator::Accelerator, sealed::IsMenuItemBase, IsMenuItem, MenuId, MenuItemKind,
-};
+use crate::{accelerator::Accelerator, sealed::IsMenuItemBase, IsMenuItem, MenuId, MenuItemKind};
 
 /// A menu item inside a [`Menu`] or [`Submenu`] and contains only text.
 ///

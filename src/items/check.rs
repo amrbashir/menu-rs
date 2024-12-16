@@ -51,7 +51,8 @@ impl CheckMenuItem {
             label: super::strip_mnemonic(item.text()),
             enabled: item.is_enabled(),
             checked: item.is_checked(),
-        }.into()
+        }
+        .into()
     }
 
     /// Create a new check menu item.
@@ -133,7 +134,7 @@ impl CheckMenuItem {
 
         #[cfg(all(feature = "ksni", target_os = "linux"))]
         self.compat.store(Arc::new(Self::compat_menu_item(&inner)));
-        
+
         #[cfg(all(feature = "ksni", target_os = "linux"))]
         crate::send_menu_update();
     }
@@ -150,7 +151,7 @@ impl CheckMenuItem {
 
         #[cfg(all(feature = "ksni", target_os = "linux"))]
         self.compat.store(Arc::new(Self::compat_menu_item(&inner)));
-        
+
         #[cfg(all(feature = "ksni", target_os = "linux"))]
         crate::send_menu_update();
     }
@@ -172,7 +173,7 @@ impl CheckMenuItem {
 
         #[cfg(all(feature = "ksni", target_os = "linux"))]
         self.compat.store(Arc::new(Self::compat_menu_item(&inner)));
-        
+
         #[cfg(all(feature = "ksni", target_os = "linux"))]
         crate::send_menu_update();
     }
