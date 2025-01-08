@@ -15,8 +15,10 @@ default = ["libxdo"]
 libxdo = ["dep:libxdo"]
 common-controls-v6 = []
 serde = ["dep:serde", "dpi/serde"]
+linux-ksni = ["arc-swap"]
 
 [dependencies]
+arc-swap = { version = "1.7.1", optional = true }
 crossbeam-channel = "0.5"
 keyboard-types = "0.7"
 once_cell = "1"

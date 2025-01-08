@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-License-Identifier: MIT
 
+mod about_dialog;
 mod accelerator;
 mod icon;
 
+pub use about_dialog::AboutDialog;
 pub(crate) use icon::PlatformIcon;
 
 use crate::{
@@ -17,7 +19,7 @@ use crate::{
 };
 use accelerator::{from_gtk_mnemonic, parse_accelerator, to_gtk_mnemonic};
 use glib::translate::ToGlibPtr;
-use gtk::{gdk, glib, prelude::*, AboutDialog, Container, Orientation};
+use gtk::{gdk, glib, prelude::*, Container, Orientation};
 use std::{
     cell::RefCell,
     collections::{hash_map::Entry, HashMap},
@@ -25,21 +27,27 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
 };
 
+#[cfg(feature = "linux-ksni")]
+use std::sync::Arc;
+
+#[cfg(feature = "linux-ksni")]
+use arc_swap::ArcSwap;
+
 static COUNTER: Counter = Counter::new();
 
 macro_rules! is_item_supported {
     ($item:tt) => {{
         let child = $item.child();
         let child_ = child.borrow();
-        let supported = if let Some(predefined_item_type) = &child_.predefined_item_type {
+        let supported = if let Some(predefined_item_kind) = &child_.predefined_item_kind {
             matches!(
-                predefined_item_type,
-                PredefinedMenuItemType::Separator
-                    | PredefinedMenuItemType::Copy
-                    | PredefinedMenuItemType::Cut
-                    | PredefinedMenuItemType::Paste
-                    | PredefinedMenuItemType::SelectAll
-                    | PredefinedMenuItemType::About(_)
+                predefined_item_kind,
+                PredefinedMenuItemKind::Separator
+                    | PredefinedMenuItemKind::Copy
+                    | PredefinedMenuItemKind::Cut
+                    | PredefinedMenuItemKind::Paste
+                    | PredefinedMenuItemKind::SelectAll
+                    | PredefinedMenuItemKind::About(_)
             )
         } else {
             true
@@ -59,7 +67,7 @@ macro_rules! return_if_item_not_supported {
 
 pub struct Menu {
     id: MenuId,
-    children: Vec<Rc<RefCell<MenuChild>>>,
+    children: Vec<MenuItemKind>,
     // TODO: maybe save a reference to the window?
     gtk_menubars: HashMap<u32, gtk::MenuBar>,
     accel_group: Option<gtk::AccelGroup>,
@@ -121,8 +129,8 @@ impl Menu {
         }
 
         match op {
-            AddOp::Append => self.children.push(item.child()),
-            AddOp::Insert(position) => self.children.insert(position, item.child()),
+            AddOp::Append => self.children.push(item.kind()),
+            AddOp::Insert(position) => self.children.insert(position, item.kind()),
         }
 
         Ok(())
@@ -170,7 +178,7 @@ impl Menu {
             let index = self
                 .children
                 .iter()
-                .position(|e| e.borrow().id == item.id())
+                .position(|e| e.id() == item.id())
                 .ok_or(crate::Error::NotAChildOfThisMenu)?;
             if remove_from_cache {
                 self.children.remove(index)
@@ -189,9 +197,8 @@ impl Menu {
             if id.map(|i| i == *menu_id).unwrap_or(true) {
                 // bail this is not a supported item like a close_window predefined menu item
                 if is_item_supported!(item) {
-                    let mut child_ = child.borrow_mut();
-
-                    if child_.item_type == MenuItemType::Submenu {
+                    if let MenuItemKind::Submenu(child) = &child {
+                        let mut child_ = child.inner.borrow_mut();
                         let menus = child_.gtk_menus.as_ref().unwrap().get(menu_id).cloned();
                         if let Some(menus) = menus {
                             for (id, menu) in menus {
@@ -205,6 +212,9 @@ impl Menu {
                         }
                         child_.gtk_menus.as_mut().unwrap().remove(menu_id);
                     }
+
+                    let child = child.inner();
+                    let child_ = child.borrow();
 
                     // remove all the gtk items that are related to this gtk menubar and destroy it
                     if let Some(items) = child_.gtk_menu_items.borrow_mut().remove(menu_id) {
@@ -225,7 +235,8 @@ impl Menu {
         // remove from the gtk menu assigned to the context menu
         if remove_from_cache {
             if let (id, Some(menu)) = &self.gtk_menu {
-                let child_ = child.borrow_mut();
+                let child = child.inner();
+                let child_ = child.borrow();
                 if let Some(items) = child_.gtk_menu_items.borrow_mut().remove(id) {
                     for item in items {
                         menu.remove(&item);
@@ -243,9 +254,15 @@ impl Menu {
     }
 
     pub fn items(&self) -> Vec<MenuItemKind> {
+        self.children.to_vec()
+    }
+
+    /// Returns a list of menu items that has been added to this menu.
+    #[cfg(feature = "linux-ksni")]
+    pub fn compat_items(&self) -> Vec<Arc<ArcSwap<crate::CompatMenuItem>>> {
         self.children
             .iter()
-            .map(|c| c.borrow().kind(c.clone()))
+            .map(MenuItemKind::compat_child)
             .collect()
     }
 
@@ -408,17 +425,17 @@ pub struct MenuChild {
     gtk_accelerator: Option<(gdk::ModifierType, u32)>,
 
     // predefined menu item fields
-    predefined_item_type: Option<PredefinedMenuItemType>,
+    pub(crate) predefined_item_kind: Option<PredefinedMenuItemKind>,
 
     // check menu item fields
     checked: Option<Rc<AtomicBool>>,
     is_syncing_checked_state: Option<Rc<AtomicBool>>,
 
     // icon menu item fields
-    icon: Option<Icon>,
+    pub(crate) icon: Option<Icon>,
 
     // submenu fields
-    pub children: Option<Vec<Rc<RefCell<MenuChild>>>>,
+    pub children: Option<Vec<MenuItemKind>>,
     gtk_menus: Option<HashMap<u32, Vec<(u32, gtk::Menu)>>>,
     gtk_menu: Option<(u32, Option<gtk::Menu>)>, // dedicated menu for tray or context menus
     accel_group: Option<gtk::AccelGroup>,
@@ -456,9 +473,10 @@ impl Drop for MenuChild {
 fn drop_children_from_menu_and_destroy(
     id: u32,
     menu: &impl IsA<Container>,
-    children: &Vec<Rc<RefCell<MenuChild>>>,
+    children: &[MenuItemKind],
 ) {
     for child in children {
+        let child = child.inner();
         let mut child_ = child.borrow_mut();
         {
             let mut menu_items = child_.gtk_menu_items.borrow_mut();
@@ -510,7 +528,7 @@ impl MenuChild {
             gtk_menus: None,
             icon: None,
             is_syncing_checked_state: None,
-            predefined_item_type: None,
+            predefined_item_kind: None,
         }
     }
 
@@ -528,20 +546,20 @@ impl MenuChild {
             gtk_accelerator: None,
             icon: None,
             is_syncing_checked_state: None,
-            predefined_item_type: None,
+            predefined_item_kind: None,
             accelerator: None,
             checked: None,
         }
     }
 
-    pub(crate) fn new_predefined(item_type: PredefinedMenuItemType, text: Option<String>) -> Self {
+    pub(crate) fn new_predefined(item_type: PredefinedMenuItemKind, text: Option<String>) -> Self {
         Self {
             text: text.unwrap_or_else(|| item_type.text().to_string()),
             enabled: true,
             accelerator: item_type.accelerator(),
             id: MenuId(COUNTER.next().to_string()),
             item_type: MenuItemType::Predefined,
-            predefined_item_type: Some(item_type),
+            predefined_item_kind: Some(item_type),
             gtk_menu_items: Rc::new(RefCell::new(HashMap::new())),
             accel_group: None,
             checked: None,
@@ -576,7 +594,7 @@ impl MenuChild {
             gtk_menu: None,
             gtk_menus: None,
             icon: None,
-            predefined_item_type: None,
+            predefined_item_kind: None,
         }
     }
 
@@ -602,7 +620,7 @@ impl MenuChild {
             gtk_menu: None,
             gtk_menus: None,
             is_syncing_checked_state: None,
-            predefined_item_type: None,
+            predefined_item_kind: None,
         }
     }
 
@@ -628,7 +646,7 @@ impl MenuChild {
             gtk_menus: None,
             icon: None,
             is_syncing_checked_state: None,
-            predefined_item_type: None,
+            predefined_item_kind: None,
         }
     }
 }
@@ -807,12 +825,12 @@ impl MenuChild {
         }
 
         match op {
-            AddOp::Append => self.children.as_mut().unwrap().push(item.child()),
+            AddOp::Append => self.children.as_mut().unwrap().push(item.kind()),
             AddOp::Insert(position) => self
                 .children
                 .as_mut()
                 .unwrap()
-                .insert(position, item.child()),
+                .insert(position, item.kind()),
         }
 
         Ok(())
@@ -864,7 +882,7 @@ impl MenuChild {
                 .as_ref()
                 .unwrap()
                 .iter()
-                .position(|e| e.borrow().id == item.id())
+                .position(|e| e.id() == item.id())
                 .ok_or(crate::Error::NotAChildOfThisMenu)?;
             if remove_from_cache {
                 self.children.as_mut().unwrap().remove(index)
@@ -884,9 +902,8 @@ impl MenuChild {
                 if id.map(|i| i == *menu_id).unwrap_or(true) {
                     // bail this is not a supported item like a close_window predefined menu item
                     if is_item_supported!(item) {
-                        let mut child_ = child.borrow_mut();
-
-                        if child_.item_type == MenuItemType::Submenu {
+                        if let MenuItemKind::Submenu(child) = &child {
+                            let mut child_ = child.inner.borrow_mut();
                             let menus = child_.gtk_menus.as_ref().unwrap().get(menu_id).cloned();
                             if let Some(menus) = menus {
                                 for (id, menu) in menus {
@@ -900,6 +917,9 @@ impl MenuChild {
                             }
                             child_.gtk_menus.as_mut().unwrap().remove(menu_id);
                         }
+
+                        let child = child.inner();
+                        let child_ = child.borrow();
 
                         // remove all the gtk items that are related to this gtk menu and destroy it
                         if let Some(items) = child_.gtk_menu_items.borrow_mut().remove(menu_id) {
@@ -921,7 +941,8 @@ impl MenuChild {
         // remove from the gtk menu assigned to the context menu
         if remove_from_cache {
             if let (id, Some(menu)) = self.gtk_menu.as_ref().unwrap() {
-                let child_ = child.borrow_mut();
+                let child = child.inner();
+                let child_ = child.borrow();
                 if let Some(items) = child_.gtk_menu_items.borrow_mut().remove(id) {
                     for item in items {
                         menu.remove(&item);
@@ -940,11 +961,16 @@ impl MenuChild {
     }
 
     pub fn items(&self) -> Vec<MenuItemKind> {
+        self.children.as_ref().unwrap().to_vec()
+    }
+
+    #[cfg(feature = "linux-ksni")]
+    pub fn compat_items(&self) -> Vec<Arc<ArcSwap<crate::CompatMenuItem>>> {
         self.children
             .as_ref()
             .unwrap()
             .iter()
-            .map(|c| c.borrow().kind(c.clone()))
+            .map(MenuItemKind::compat_child)
             .collect()
     }
 
@@ -1092,7 +1118,7 @@ impl MenuChild {
             .as_ref()
             .map(parse_accelerator)
             .transpose()?;
-        let predefined_item_type = self.predefined_item_type.clone().unwrap();
+        let predefined_item_kind = self.predefined_item_kind.clone().unwrap();
 
         let make_item = || {
             gtk::MenuItem::builder()
@@ -1115,17 +1141,17 @@ impl MenuChild {
             }
         };
 
-        let item = match predefined_item_type {
-            PredefinedMenuItemType::Separator => {
+        let item = match predefined_item_kind {
+            PredefinedMenuItemKind::Separator => {
                 gtk::SeparatorMenuItem::new().upcast::<gtk::MenuItem>()
             }
-            PredefinedMenuItemType::Copy
-            | PredefinedMenuItemType::Cut
-            | PredefinedMenuItemType::Paste
-            | PredefinedMenuItemType::SelectAll => {
+            PredefinedMenuItemKind::Copy
+            | PredefinedMenuItemKind::Cut
+            | PredefinedMenuItemKind::Paste
+            | PredefinedMenuItemKind::SelectAll => {
                 let item = make_item();
                 let (mods, key) =
-                    parse_accelerator(&predefined_item_type.accelerator().unwrap()).unwrap();
+                    parse_accelerator(&predefined_item_kind.accelerator().unwrap()).unwrap();
                 item.child()
                     .unwrap()
                     .downcast::<gtk::AccelLabel>()
@@ -1135,51 +1161,17 @@ impl MenuChild {
                     // TODO: wayland
                     #[cfg(feature = "libxdo")]
                     if let Ok(xdo) = libxdo::XDo::new(None) {
-                        let _ = xdo.send_keysequence(predefined_item_type.xdo_keys(), 0);
+                        let _ = xdo.send_keysequence(predefined_item_kind.xdo_keys(), 0);
                     }
                 });
                 item
             }
-            PredefinedMenuItemType::About(metadata) => {
+            PredefinedMenuItemKind::About(metadata) => {
                 let item = make_item();
                 register_accel(&item);
                 item.connect_activate(move |_| {
-                    if let Some(metadata) = &metadata {
-                        let mut builder = AboutDialog::builder().modal(true).resizable(false);
-
-                        if let Some(name) = &metadata.name {
-                            builder = builder.program_name(name);
-                        }
-                        if let Some(version) = &metadata.full_version() {
-                            builder = builder.version(version);
-                        }
-                        if let Some(authors) = &metadata.authors {
-                            builder = builder.authors(authors.clone());
-                        }
-                        if let Some(comments) = &metadata.comments {
-                            builder = builder.comments(comments);
-                        }
-                        if let Some(copyright) = &metadata.copyright {
-                            builder = builder.copyright(copyright);
-                        }
-                        if let Some(license) = &metadata.license {
-                            builder = builder.license(license);
-                        }
-                        if let Some(website) = &metadata.website {
-                            builder = builder.website(website);
-                        }
-                        if let Some(website_label) = &metadata.website_label {
-                            builder = builder.website_label(website_label);
-                        }
-                        if let Some(icon) = &metadata.icon {
-                            builder = builder.logo(&icon.inner.to_pixbuf());
-                        }
-
-                        let about = builder.build();
-                        about.run();
-                        unsafe {
-                            about.destroy();
-                        }
+                    if let Some(metadata) = metadata.clone() {
+                        AboutDialog::new(metadata).show();
                     }
                 });
                 item
@@ -1447,14 +1439,14 @@ fn show_context_menu(
     false
 }
 
-impl PredefinedMenuItemType {
+impl PredefinedMenuItemKind {
     #[cfg(feature = "libxdo")]
     fn xdo_keys(&self) -> &str {
         match self {
-            PredefinedMenuItemType::Copy => "ctrl+c",
-            PredefinedMenuItemType::Cut => "ctrl+X",
-            PredefinedMenuItemType::Paste => "ctrl+v",
-            PredefinedMenuItemType::SelectAll => "ctrl+a",
+            PredefinedMenuItemKind::Copy => "ctrl+c",
+            PredefinedMenuItemKind::Cut => "ctrl+X",
+            PredefinedMenuItemKind::Paste => "ctrl+v",
+            PredefinedMenuItemKind::SelectAll => "ctrl+a",
             _ => unreachable!(),
         }
     }

@@ -12,12 +12,21 @@ mod platform;
 #[path = "macos/mod.rs"]
 mod platform;
 
+#[cfg(target_os = "linux")]
+pub use platform::AboutDialog;
+
 use std::{
     cell::{Ref, RefCell, RefMut},
     rc::Rc,
 };
 
-use crate::{items::*, IsMenuItem, MenuItemKind, MenuItemType};
+#[cfg(all(feature = "linux-ksni", target_os = "linux"))]
+use std::sync::Arc;
+
+#[cfg(all(feature = "linux-ksni", target_os = "linux"))]
+use arc_swap::ArcSwap;
+
+use crate::{IsMenuItem, MenuItemKind};
 
 pub(crate) use self::platform::*;
 
@@ -35,7 +44,10 @@ impl dyn IsMenuItem + '_ {
 
 /// Internal utilities
 impl MenuChild {
+    #[cfg(not(target_os = "linux"))]
     fn kind(&self, c: Rc<RefCell<MenuChild>>) -> MenuItemKind {
+        use crate::{items::*, MenuItemType};
+
         match self.item_type() {
             MenuItemType::Submenu => {
                 let id = c.borrow().id().clone();
@@ -105,6 +117,18 @@ impl MenuItemKind {
             MenuItemKind::Predefined(i) => i.inner.borrow_mut(),
             MenuItemKind::Check(i) => i.inner.borrow_mut(),
             MenuItemKind::Icon(i) => i.inner.borrow_mut(),
+        }
+    }
+
+    #[cfg(all(feature = "linux-ksni", target_os = "linux"))]
+    pub(crate) fn compat_child(&self) -> Arc<ArcSwap<crate::CompatMenuItem>> {
+        use crate::items::*;
+        match self {
+            MenuItemKind::MenuItem(i) => i.compat.clone(),
+            MenuItemKind::Submenu(i) => i.compat.clone(),
+            MenuItemKind::Predefined(i) => i.compat.clone(),
+            MenuItemKind::Check(i) => i.compat.clone(),
+            MenuItemKind::Icon(i) => i.compat.clone(),
         }
     }
 }

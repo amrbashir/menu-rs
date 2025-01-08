@@ -4,6 +4,12 @@
 
 use std::{cell::RefCell, mem, rc::Rc};
 
+#[cfg(all(feature = "linux-ksni", target_os = "linux"))]
+use std::sync::Arc;
+
+#[cfg(all(feature = "linux-ksni", target_os = "linux"))]
+use arc_swap::ArcSwap;
+
 use crate::{
     accelerator::Accelerator,
     icon::{Icon, NativeIcon},
@@ -16,10 +22,12 @@ use crate::{
 ///
 /// [`Menu`]: crate::Menu
 /// [`Submenu`]: crate::Submenu
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct IconMenuItem {
     pub(crate) id: Rc<MenuId>,
     pub(crate) inner: Rc<RefCell<crate::platform_impl::MenuChild>>,
+    #[cfg(all(feature = "linux-ksni", target_os = "linux"))]
+    pub(crate) compat: Arc<ArcSwap<crate::CompatMenuItem>>,
 }
 
 impl IsMenuItemBase for IconMenuItem {}
@@ -38,6 +46,23 @@ impl IsMenuItem for IconMenuItem {
 }
 
 impl IconMenuItem {
+    #[cfg(all(feature = "linux-ksni", target_os = "linux"))]
+    pub(crate) fn compat_menu_item(
+        item: &crate::platform_impl::MenuChild,
+    ) -> crate::CompatMenuItem {
+        crate::CompatStandardItem {
+            id: item.id().0.clone(),
+            label: super::strip_mnemonic(item.text()),
+            enabled: item.is_enabled(),
+            icon: item
+                .icon
+                .as_ref()
+                .map(|icon| icon.to_pixbuf().save_to_bufferv("png", &[]).unwrap()),
+            predefined_menu_item_kind: None,
+        }
+        .into()
+    }
+
     /// Create a new icon menu item.
     ///
     /// - `text` could optionally contain an `&` before a character to assign this character as the mnemonic
@@ -48,16 +73,22 @@ impl IconMenuItem {
         icon: Option<Icon>,
         accelerator: Option<Accelerator>,
     ) -> Self {
-        let item = crate::platform_impl::MenuChild::new_icon(
+        let inner = crate::platform_impl::MenuChild::new_icon(
             text.as_ref(),
             enabled,
             icon,
             accelerator,
             None,
         );
+
+        #[cfg(all(feature = "linux-ksni", target_os = "linux"))]
+        let compat = Self::compat_menu_item(&inner);
+
         Self {
-            id: Rc::new(item.id().clone()),
-            inner: Rc::new(RefCell::new(item)),
+            id: Rc::new(inner.id().clone()),
+            inner: Rc::new(RefCell::new(inner)),
+            #[cfg(all(feature = "linux-ksni", target_os = "linux"))]
+            compat: Arc::new(ArcSwap::from_pointee(compat)),
         }
     }
 
@@ -73,15 +104,22 @@ impl IconMenuItem {
         accelerator: Option<Accelerator>,
     ) -> Self {
         let id = id.into();
+        let inner = crate::platform_impl::MenuChild::new_icon(
+            text.as_ref(),
+            enabled,
+            icon,
+            accelerator,
+            Some(id.clone()),
+        );
+
+        #[cfg(all(feature = "linux-ksni", target_os = "linux"))]
+        let compat = Self::compat_menu_item(&inner);
+
         Self {
-            id: Rc::new(id.clone()),
-            inner: Rc::new(RefCell::new(crate::platform_impl::MenuChild::new_icon(
-                text.as_ref(),
-                enabled,
-                icon,
-                accelerator,
-                Some(id),
-            ))),
+            id: Rc::new(id),
+            inner: Rc::new(RefCell::new(inner)),
+            #[cfg(all(feature = "linux-ksni", target_os = "linux"))]
+            compat: Arc::new(ArcSwap::from_pointee(compat)),
         }
     }
 
@@ -98,16 +136,22 @@ impl IconMenuItem {
         native_icon: Option<NativeIcon>,
         accelerator: Option<Accelerator>,
     ) -> Self {
-        let item = crate::platform_impl::MenuChild::new_native_icon(
+        let inner = crate::platform_impl::MenuChild::new_native_icon(
             text.as_ref(),
             enabled,
             native_icon,
             accelerator,
             None,
         );
+
+        #[cfg(all(feature = "linux-ksni", target_os = "linux"))]
+        let compat = Self::compat_menu_item(&inner);
+
         Self {
-            id: Rc::new(item.id().clone()),
-            inner: Rc::new(RefCell::new(item)),
+            id: Rc::new(inner.id().clone()),
+            inner: Rc::new(RefCell::new(inner)),
+            #[cfg(all(feature = "linux-ksni", target_os = "linux"))]
+            compat: Arc::new(ArcSwap::from_pointee(compat)),
         }
     }
 
@@ -126,17 +170,22 @@ impl IconMenuItem {
         accelerator: Option<Accelerator>,
     ) -> Self {
         let id = id.into();
+        let inner = crate::platform_impl::MenuChild::new_native_icon(
+            text.as_ref(),
+            enabled,
+            native_icon,
+            accelerator,
+            Some(id.clone()),
+        );
+
+        #[cfg(all(feature = "linux-ksni", target_os = "linux"))]
+        let compat = Self::compat_menu_item(&inner);
+
         Self {
-            id: Rc::new(id.clone()),
-            inner: Rc::new(RefCell::new(
-                crate::platform_impl::MenuChild::new_native_icon(
-                    text.as_ref(),
-                    enabled,
-                    native_icon,
-                    accelerator,
-                    Some(id),
-                ),
-            )),
+            id: Rc::new(id),
+            inner: Rc::new(RefCell::new(inner)),
+            #[cfg(all(feature = "linux-ksni", target_os = "linux"))]
+            compat: Arc::new(ArcSwap::from_pointee(compat)),
         }
     }
 
@@ -145,26 +194,40 @@ impl IconMenuItem {
         &self.id
     }
 
-    /// Get the text for this check menu item.
+    /// Get the text for this icon menu item.
     pub fn text(&self) -> String {
         self.inner.borrow().text()
     }
 
-    /// Set the text for this check menu item. `text` could optionally contain
+    /// Set the text for this icon menu item. `text` could optionally contain
     /// an `&` before a character to assign this character as the mnemonic
-    /// for this check menu item. To display a `&` without assigning a mnemenonic, use `&&`.
+    /// for this icon menu item. To display a `&` without assigning a mnemenonic, use `&&`.
     pub fn set_text<S: AsRef<str>>(&self, text: S) {
-        self.inner.borrow_mut().set_text(text.as_ref())
+        let mut inner = self.inner.borrow_mut();
+        inner.set_text(text.as_ref());
+
+        #[cfg(all(feature = "linux-ksni", target_os = "linux"))]
+        self.compat.store(Arc::new(Self::compat_menu_item(&inner)));
+
+        #[cfg(all(feature = "linux-ksni", target_os = "linux"))]
+        crate::send_menu_update();
     }
 
-    /// Get whether this check menu item is enabled or not.
+    /// Get whether this icon menu item is enabled or not.
     pub fn is_enabled(&self) -> bool {
         self.inner.borrow().is_enabled()
     }
 
-    /// Enable or disable this check menu item.
+    /// Enable or disable this icon menu item.
     pub fn set_enabled(&self, enabled: bool) {
-        self.inner.borrow_mut().set_enabled(enabled)
+        let mut inner = self.inner.borrow_mut();
+        inner.set_enabled(enabled);
+
+        #[cfg(all(feature = "linux-ksni", target_os = "linux"))]
+        self.compat.store(Arc::new(Self::compat_menu_item(&inner)));
+
+        #[cfg(all(feature = "linux-ksni", target_os = "linux"))]
+        crate::send_menu_update();
     }
 
     /// Set this icon menu item accelerator.
@@ -172,9 +235,21 @@ impl IconMenuItem {
         self.inner.borrow_mut().set_accelerator(accelerator)
     }
 
+    /// Get the icon for this icon menu item.
+    pub fn icon(&self) -> Option<Icon> {
+        self.inner.borrow().icon.clone()
+    }
+
     /// Change this menu item icon or remove it.
     pub fn set_icon(&self, icon: Option<Icon>) {
-        self.inner.borrow_mut().set_icon(icon)
+        let mut inner = self.inner.borrow_mut();
+        inner.set_icon(icon);
+
+        #[cfg(all(feature = "linux-ksni", target_os = "linux"))]
+        self.compat.store(Arc::new(Self::compat_menu_item(&inner)));
+
+        #[cfg(all(feature = "linux-ksni", target_os = "linux"))]
+        crate::send_menu_update();
     }
 
     /// Change this menu item icon to a native image or remove it.
@@ -184,7 +259,7 @@ impl IconMenuItem {
     /// - **Windows / Linux**: Unsupported.
     pub fn set_native_icon(&self, _icon: Option<NativeIcon>) {
         #[cfg(target_os = "macos")]
-        self.inner.borrow_mut().set_native_icon(_icon)
+        self.inner.borrow_mut().set_native_icon(_icon);
     }
 
     /// Convert this menu item into its menu ID.

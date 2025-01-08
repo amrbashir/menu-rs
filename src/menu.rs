@@ -4,6 +4,12 @@
 
 use std::{cell::RefCell, rc::Rc};
 
+#[cfg(all(feature = "linux-ksni", target_os = "linux"))]
+use std::sync::Arc;
+
+#[cfg(all(feature = "linux-ksni", target_os = "linux"))]
+use arc_swap::ArcSwap;
+
 use crate::{dpi::Position, util::AddOp, ContextMenu, IsMenuItem, MenuId, MenuItemKind};
 
 /// A root menu that can be added to a Window on Windows and Linux
@@ -405,6 +411,11 @@ impl ContextMenu for Menu {
     #[cfg(target_os = "linux")]
     fn gtk_context_menu(&self) -> gtk::Menu {
         self.inner.borrow_mut().gtk_context_menu()
+    }
+
+    #[cfg(all(feature = "linux-ksni", target_os = "linux"))]
+    fn compat_items(&self) -> Vec<Arc<ArcSwap<crate::CompatMenuItem>>> {
+        self.inner.borrow_mut().compat_items()
     }
 
     #[cfg(target_os = "macos")]
