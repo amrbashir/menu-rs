@@ -15,7 +15,7 @@ default = ["libxdo"]
 libxdo = ["dep:libxdo"]
 common-controls-v6 = []
 serde = ["dep:serde", "dpi/serde"]
-ksni = ["arc-swap"]
+linux-ksni = ["arc-swap"]
 
 [dependencies]
 arc-swap = { version = "1.7.1", optional = true }

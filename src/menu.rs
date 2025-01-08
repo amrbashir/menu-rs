@@ -4,10 +4,10 @@
 
 use std::{cell::RefCell, rc::Rc};
 
-#[cfg(all(feature = "ksni", target_os = "linux"))]
+#[cfg(all(feature = "linux-ksni", target_os = "linux"))]
 use std::sync::Arc;
 
-#[cfg(all(feature = "ksni", target_os = "linux"))]
+#[cfg(all(feature = "linux-ksni", target_os = "linux"))]
 use arc_swap::ArcSwap;
 
 use crate::{dpi::Position, util::AddOp, ContextMenu, IsMenuItem, MenuId, MenuItemKind};
@@ -413,7 +413,7 @@ impl ContextMenu for Menu {
         self.inner.borrow_mut().gtk_context_menu()
     }
 
-    #[cfg(all(feature = "ksni", target_os = "linux"))]
+    #[cfg(all(feature = "linux-ksni", target_os = "linux"))]
     fn compat_items(&self) -> Vec<Arc<ArcSwap<crate::CompatMenuItem>>> {
         self.inner.borrow_mut().compat_items()
     }

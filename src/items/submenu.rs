@@ -4,10 +4,10 @@
 
 use std::{cell::RefCell, mem, rc::Rc};
 
-#[cfg(all(feature = "ksni", target_os = "linux"))]
+#[cfg(all(feature = "linux-ksni", target_os = "linux"))]
 use std::sync::Arc;
 
-#[cfg(all(feature = "ksni", target_os = "linux"))]
+#[cfg(all(feature = "linux-ksni", target_os = "linux"))]
 use arc_swap::ArcSwap;
 
 use crate::{
@@ -22,7 +22,7 @@ use crate::{
 pub struct Submenu {
     pub(crate) id: Rc<MenuId>,
     pub(crate) inner: Rc<RefCell<crate::platform_impl::MenuChild>>,
-    #[cfg(all(feature = "ksni", target_os = "linux"))]
+    #[cfg(all(feature = "linux-ksni", target_os = "linux"))]
     pub(crate) compat: Arc<ArcSwap<crate::CompatMenuItem>>,
 }
 
@@ -42,7 +42,7 @@ impl IsMenuItem for Submenu {
 }
 
 impl Submenu {
-    #[cfg(all(feature = "ksni", target_os = "linux"))]
+    #[cfg(all(feature = "linux-ksni", target_os = "linux"))]
     pub(crate) fn compat_menu_item(
         item: &crate::platform_impl::MenuChild,
     ) -> crate::CompatMenuItem {
@@ -61,13 +61,13 @@ impl Submenu {
     pub fn new<S: AsRef<str>>(text: S, enabled: bool) -> Self {
         let item = crate::platform_impl::MenuChild::new_submenu(text.as_ref(), enabled, None);
 
-        #[cfg(all(feature = "ksni", target_os = "linux"))]
+        #[cfg(all(feature = "linux-ksni", target_os = "linux"))]
         let compat = Self::compat_menu_item(&item);
 
         Self {
             id: Rc::new(item.id().clone()),
             inner: Rc::new(RefCell::new(item)),
-            #[cfg(all(feature = "ksni", target_os = "linux"))]
+            #[cfg(all(feature = "linux-ksni", target_os = "linux"))]
             compat: Arc::new(ArcSwap::from_pointee(compat)),
         }
     }
@@ -81,13 +81,13 @@ impl Submenu {
         let item =
             crate::platform_impl::MenuChild::new_submenu(text.as_ref(), enabled, Some(id.clone()));
 
-        #[cfg(all(feature = "ksni", target_os = "linux"))]
+        #[cfg(all(feature = "linux-ksni", target_os = "linux"))]
         let compat = Self::compat_menu_item(&item);
 
         Self {
             id: Rc::new(id),
             inner: Rc::new(RefCell::new(item)),
-            #[cfg(all(feature = "ksni", target_os = "linux"))]
+            #[cfg(all(feature = "linux-ksni", target_os = "linux"))]
             compat: Arc::new(ArcSwap::from_pointee(compat)),
         }
     }
@@ -125,10 +125,10 @@ impl Submenu {
         let mut inner = self.inner.borrow_mut();
         inner.add_menu_item(item, AddOp::Append)?;
 
-        #[cfg(all(feature = "ksni", target_os = "linux"))]
+        #[cfg(all(feature = "linux-ksni", target_os = "linux"))]
         self.compat.store(Arc::new(Self::compat_menu_item(&inner)));
 
-        #[cfg(all(feature = "ksni", target_os = "linux"))]
+        #[cfg(all(feature = "linux-ksni", target_os = "linux"))]
         crate::send_menu_update();
 
         Ok(())
@@ -148,10 +148,10 @@ impl Submenu {
         let mut inner = self.inner.borrow_mut();
         inner.add_menu_item(item, AddOp::Insert(0))?;
 
-        #[cfg(all(feature = "ksni", target_os = "linux"))]
+        #[cfg(all(feature = "linux-ksni", target_os = "linux"))]
         self.compat.store(Arc::new(Self::compat_menu_item(&inner)));
 
-        #[cfg(all(feature = "ksni", target_os = "linux"))]
+        #[cfg(all(feature = "linux-ksni", target_os = "linux"))]
         crate::send_menu_update();
 
         Ok(())
@@ -169,10 +169,10 @@ impl Submenu {
         let mut inner = self.inner.borrow_mut();
         inner.add_menu_item(item, AddOp::Insert(position))?;
 
-        #[cfg(all(feature = "ksni", target_os = "linux"))]
+        #[cfg(all(feature = "linux-ksni", target_os = "linux"))]
         self.compat.store(Arc::new(Self::compat_menu_item(&inner)));
 
-        #[cfg(all(feature = "ksni", target_os = "linux"))]
+        #[cfg(all(feature = "linux-ksni", target_os = "linux"))]
         crate::send_menu_update();
 
         Ok(())
@@ -192,10 +192,10 @@ impl Submenu {
         let mut inner = self.inner.borrow_mut();
         inner.remove(item)?;
 
-        #[cfg(all(feature = "ksni", target_os = "linux"))]
+        #[cfg(all(feature = "linux-ksni", target_os = "linux"))]
         self.compat.store(Arc::new(Self::compat_menu_item(&inner)));
 
-        #[cfg(all(feature = "ksni", target_os = "linux"))]
+        #[cfg(all(feature = "linux-ksni", target_os = "linux"))]
         crate::send_menu_update();
 
         Ok(())
@@ -230,10 +230,10 @@ impl Submenu {
         let mut inner = self.inner.borrow_mut();
         inner.set_text(text.as_ref());
 
-        #[cfg(all(feature = "ksni", target_os = "linux"))]
+        #[cfg(all(feature = "linux-ksni", target_os = "linux"))]
         self.compat.store(Arc::new(Self::compat_menu_item(&inner)));
 
-        #[cfg(all(feature = "ksni", target_os = "linux"))]
+        #[cfg(all(feature = "linux-ksni", target_os = "linux"))]
         crate::send_menu_update();
     }
 
@@ -247,10 +247,10 @@ impl Submenu {
         let mut inner = self.inner.borrow_mut();
         inner.set_enabled(enabled);
 
-        #[cfg(all(feature = "ksni", target_os = "linux"))]
+        #[cfg(all(feature = "linux-ksni", target_os = "linux"))]
         self.compat.store(Arc::new(Self::compat_menu_item(&inner)));
 
-        #[cfg(all(feature = "ksni", target_os = "linux"))]
+        #[cfg(all(feature = "linux-ksni", target_os = "linux"))]
         crate::send_menu_update();
     }
 
@@ -263,10 +263,10 @@ impl Submenu {
         let mut inner = self.inner.borrow_mut();
         inner.set_as_windows_menu_for_nsapp();
 
-        #[cfg(all(feature = "ksni", target_os = "linux"))]
+        #[cfg(all(feature = "linux-ksni", target_os = "linux"))]
         self.compat.store(Arc::new(Self::compat_menu_item(&inner)));
 
-        #[cfg(all(feature = "ksni", target_os = "linux"))]
+        #[cfg(all(feature = "linux-ksni", target_os = "linux"))]
         crate::send_menu_update();
     }
 
@@ -281,10 +281,10 @@ impl Submenu {
         let mut inner = self.inner.borrow_mut();
         inner.set_as_help_menu_for_nsapp();
 
-        #[cfg(all(feature = "ksni", target_os = "linux"))]
+        #[cfg(all(feature = "linux-ksni", target_os = "linux"))]
         self.compat.store(Arc::new(Self::compat_menu_item(&inner)));
 
-        #[cfg(all(feature = "ksni", target_os = "linux"))]
+        #[cfg(all(feature = "linux-ksni", target_os = "linux"))]
         crate::send_menu_update();
     }
 
@@ -338,7 +338,7 @@ impl ContextMenu for Submenu {
         self.inner.borrow_mut().gtk_context_menu()
     }
 
-    #[cfg(all(feature = "ksni", target_os = "linux"))]
+    #[cfg(all(feature = "linux-ksni", target_os = "linux"))]
     fn compat_items(&self) -> Vec<Arc<ArcSwap<crate::CompatMenuItem>>> {
         self.inner.borrow_mut().compat_items()
     }

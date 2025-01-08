@@ -27,10 +27,10 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
 };
 
-#[cfg(feature = "ksni")]
+#[cfg(feature = "linux-ksni")]
 use std::sync::Arc;
 
-#[cfg(feature = "ksni")]
+#[cfg(feature = "linux-ksni")]
 use arc_swap::ArcSwap;
 
 static COUNTER: Counter = Counter::new();
@@ -258,7 +258,7 @@ impl Menu {
     }
 
     /// Returns a list of menu items that has been added to this menu.
-    #[cfg(feature = "ksni")]
+    #[cfg(feature = "linux-ksni")]
     pub fn compat_items(&self) -> Vec<Arc<ArcSwap<crate::CompatMenuItem>>> {
         self.children
             .iter()
@@ -964,7 +964,7 @@ impl MenuChild {
         self.children.as_ref().unwrap().to_vec()
     }
 
-    #[cfg(feature = "ksni")]
+    #[cfg(feature = "linux-ksni")]
     pub fn compat_items(&self) -> Vec<Arc<ArcSwap<crate::CompatMenuItem>>> {
         self.children
             .as_ref()

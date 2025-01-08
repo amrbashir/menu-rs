@@ -155,10 +155,10 @@
 
 use std::{cell::RefCell, rc::Rc};
 
-#[cfg(all(feature = "ksni", target_os = "linux"))]
+#[cfg(all(feature = "linux-ksni", target_os = "linux"))]
 use std::sync::Arc;
 
-#[cfg(all(feature = "ksni", target_os = "linux"))]
+#[cfg(all(feature = "linux-ksni", target_os = "linux"))]
 use arc_swap::ArcSwap;
 
 use crossbeam_channel::{unbounded, Receiver, Sender};
@@ -413,7 +413,7 @@ pub trait ContextMenu {
     fn gtk_context_menu(&self) -> gtk::Menu;
 
     /// Get all menu items within this context menu.
-    #[cfg(all(feature = "ksni", target_os = "linux"))]
+    #[cfg(all(feature = "linux-ksni", target_os = "linux"))]
     fn compat_items(&self) -> Vec<Arc<ArcSwap<crate::CompatMenuItem>>>;
 
     /// Shows this menu as a context menu for the specified `NSView`.
@@ -494,15 +494,15 @@ impl MenuEvent {
     }
 }
 
-#[cfg(all(feature = "ksni", target_os = "linux"))]
+#[cfg(all(feature = "linux-ksni", target_os = "linux"))]
 static MENU_UPDATE_CHANNEL: Lazy<(Sender<()>, Receiver<()>)> = Lazy::new(unbounded);
 
-#[cfg(all(feature = "ksni", target_os = "linux"))]
+#[cfg(all(feature = "linux-ksni", target_os = "linux"))]
 pub fn recv_menu_update() -> std::result::Result<(), crossbeam_channel::RecvError> {
     MENU_UPDATE_CHANNEL.1.recv()
 }
 
-#[cfg(all(feature = "ksni", target_os = "linux"))]
+#[cfg(all(feature = "linux-ksni", target_os = "linux"))]
 pub fn send_menu_update() {
     let _ = MENU_UPDATE_CHANNEL.0.send(());
 }
