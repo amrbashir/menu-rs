@@ -6,6 +6,8 @@
 
 #![allow(non_snake_case, clippy::upper_case_acronyms)]
 
+use std::cell::OnceCell;
+
 use once_cell::sync::Lazy;
 use windows_sys::{
     s,
@@ -76,24 +78,18 @@ impl Drop for HBrush {
 
 fn background_brush() -> HBRUSH {
     const BACKGROUND_COLOR: u32 = 2829099;
-    static mut BACKGROUND_BRUSH: Option<HBrush> = None;
-    unsafe {
-        if BACKGROUND_BRUSH.is_none() {
-            BACKGROUND_BRUSH = Some(HBrush(CreateSolidBrush(BACKGROUND_COLOR)));
-        }
-        BACKGROUND_BRUSH.as_ref().unwrap().0
-    }
+    static BACKGROUND_BRUSH: OnceCell<HBrush> = OnceCell::new();
+
+    let hbrush = BACKGROUND_BRUSH.get_or_init(|| HBrush(CreateSolidBrush(BACKGROUND_COLOR)));
+    hbrush.as_ref().unwrap().0
 }
 
 fn selected_background_brush() -> HBRUSH {
     const SELECTED_BACKGROUND_COLOR: u32 = 4276545;
-    static mut SELECTED_BACKGROUND_BRUSH: Option<HBrush> = None;
-    unsafe {
-        if SELECTED_BACKGROUND_BRUSH.is_none() {
-            SELECTED_BACKGROUND_BRUSH = Some(HBrush(CreateSolidBrush(SELECTED_BACKGROUND_COLOR)));
-        }
-        SELECTED_BACKGROUND_BRUSH.as_ref().unwrap().0
-    }
+    static SELECTED_BACKGROUND_BRUSH: OnceCell<HBrush> = OnceCell::new();
+
+    let hbrush = SELECTED_BACKGROUND_BRUSH.get_or_init(|| HBrush(CreateSolidBrush(SELECTED_BACKGROUND_COLOR)));
+    hbrush.as_ref().unwrap().0
 }
 
 /// Draws a dark menu bar if needed and returns whether it draws it or not

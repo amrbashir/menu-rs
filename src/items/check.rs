@@ -168,14 +168,23 @@ impl CheckMenuItem {
 
     /// Check or Uncheck this check menu item.
     pub fn set_checked(&self, checked: bool) {
-        let mut inner = self.inner.borrow_mut();
-        inner.set_checked(checked);
+        #[cfg(target_os = "macos")]
+        {
+            let inner = self.inner.borrow();
+            inner.set_checked(checked);
+        }
 
-        #[cfg(all(feature = "linux-ksni", target_os = "linux"))]
-        self.compat.store(Arc::new(Self::compat_menu_item(&inner)));
+        #[cfg(not(target_os = "macos"))]
+        {
+            let mut inner = self.inner.borrow_mut();
+            inner.set_checked(checked);
 
-        #[cfg(all(feature = "linux-ksni", target_os = "linux"))]
-        crate::send_menu_update();
+            #[cfg(all(feature = "linux-ksni", target_os = "linux"))]
+            {
+                self.compat.store(Arc::new(Self::compat_menu_item(&inner)));
+                crate::send_menu_update();
+            }
+        }
     }
 
     /// Convert this menu item into its menu ID.
